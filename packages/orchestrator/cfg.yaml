@@ -1,0 +1,15 @@
+
+### Resume
+resume_from_checkpoint: undefined
+
+### Resume
+resume_from_checkpoint: /out/ckpt
+
+### Resume
+resume_from_checkpoint: /out/ckpt
+
+### Resume
+resume_from_checkpoint: undefined
+
+### Resume
+resume_from_checkpoint: /out/ckpt

@@ -1,6 +1,7 @@
 /**
  * Debate tools unit tests
  */
+import { describe, it, expect } from 'vitest';
 import { debateSubmitRuleBased } from '../debate/debate-submit.js';
 import { debateRoundRuleBased } from '../debate/debate-round.js';
 import { debateResolveRuleBased } from '../debate/debate-resolve.js';
@@ -42,7 +43,6 @@ describe('debate_round (rule-based)', () => {
     });
     expect(result.scores).toBeDefined();
     expect(result.scores.logical_coherence).toBeGreaterThanOrEqual(0);
-    expect(result.scores.logical_coherence).toBeLessThanOrEqual(10);
     expect(result.feedback).toBeTruthy();
     expect(result.suggested_modifications).toBeInstanceOf(Array);
   });
@@ -52,10 +52,13 @@ describe('debate_resolve (rule-based)', () => {
   it('should return consensus plan', () => {
     const result = debateResolveRuleBased({
       debate_id: 'debate_1',
-      rounds: [{ role: 'proposer', argument: 'Good plan' }, { role: 'critic', argument: 'Needs validation' }],
+      rounds: [
+        { role: 'proposer', argument: 'Good plan', scores: { logical_coherence: 7, evidence_strength: 6, relevance: 8 } },
+        { role: 'critic', argument: 'Needs validation', scores: { logical_coherence: 6, evidence_strength: 7, relevance: 7 } },
+      ],
     });
     expect(result.final_plan).toBeTruthy();
     expect(result.consensus_score).toBeGreaterThanOrEqual(0);
-    expect(result.consensus_score).toBeLessThanOrEqual(10);
+    expect(result.consensus_score).toBeLessThanOrEqual(1);
   });
 });

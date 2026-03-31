@@ -1,40 +1,47 @@
-import { describe, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
+/**
+ * Science tools unit tests
+ */
 import { sciencePyscf } from '../pyscf.js';
 import { scienceRdkit } from '../rdkit.js';
 import { scienceOpenmm } from '../openmm.js';
 import { scienceJupyter } from '../jupyter.js';
 
-describe('science tools', () => {
-  it('pyscf generates script', async () => {
+describe('science_pyscf', () => {
+  it('should generate pyscf script', async () => {
     const result = await sciencePyscf({
       calculation_type: 'scf',
       molecule: { format: 'smiles', value: 'CCO' },
       basis_set: '6-31G*',
     });
-    console.log('pyscf result keys:', Object.keys(result));
+    expect(result).toBeDefined();
   });
+});
 
-  it('rdkit generates script', async () => {
+describe('science_rdkit', () => {
+  it('should generate rdkit script', async () => {
     const result = await scienceRdkit({
       operation: 'descriptor',
       molecules: [{ format: 'smiles', value: 'CCO' }],
     });
-    console.log('rdkit result keys:', Object.keys(result));
+    expect(result).toBeDefined();
   });
+});
 
-  it('openmm generates script', async () => {
-    const result = await scienceOpenmm({
-      pdb_file: '/tmp/test.pdb',
-    });
-    console.log('openmm result:', result.trajectory_path);
+describe('science_openmm', () => {
+  it('should generate openmm script', async () => {
+    const result = await scienceOpenmm({ pdb_file: '/tmp/test.pdb' });
+    expect(result.trajectory_path).toBeTruthy();
   });
+});
 
-  it('jupyter create', async () => {
+describe('science_jupyter', () => {
+  it('should create notebook', async () => {
     const result = await scienceJupyter({
       operation: 'create',
       notebook_path: '/tmp/test.ipynb',
       cells: [{ cell_type: 'code', source: 'print("hello")' }],
     });
-    console.log('jupyter result:', result.notebook_path);
+    expect(result.notebook_path).toBeTruthy();
   });
 });

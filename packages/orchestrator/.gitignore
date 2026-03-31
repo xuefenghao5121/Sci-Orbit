@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.js.map
+.ai4s_kb/
+experiments/
+finetune_data/
+finetune_output/
+*.log
+.env
+.DS_Store

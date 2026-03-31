@@ -43,9 +43,19 @@ export class FeedbackCollector {
     return feedback;
   }
 
+  private readAllFeedbacks(): Feedback[] {
+    if (!existsSync(this.storePath)) return [];
+    try {
+      const files = readdirSync(this.storePath).filter(f => f.endsWith('.json'));
+      return files.map(f => {
+        try { return JSON.parse(readFileSync(join(this.storePath, f), 'utf-8')); } catch { return null; }
+      }).filter(Boolean);
+    } catch { return []; }
+  }
+
   listFeedbacks(filter?: FeedbackFilter): Feedback[] {
     if (!existsSync(this.storePath)) return [];
-    let feedbacks = this.listFeedbacks();
+    let feedbacks = this.readAllFeedbacks();
     if (filter?.type) feedbacks = feedbacks.filter(f => f.type === filter.type);
     if (filter?.applied !== undefined) feedbacks = feedbacks.filter(f => f.applied === filter.applied);
     if (filter?.since) feedbacks = feedbacks.filter(f => f.timestamp >= filter.since!);

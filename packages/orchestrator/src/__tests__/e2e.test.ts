@@ -1,7 +1,7 @@
 /**
  * E2E Tests — MCP Server integration
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from 'vitest';
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 

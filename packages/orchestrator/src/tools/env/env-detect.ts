@@ -29,5 +29,5 @@ export function envDetect(): EnvDetectOutput {
     installedPackages.push(...pkgs.split('\n').filter(l => l.trim()).map(l => l.split(/\s+/)[0]).filter(Boolean).slice(0, 50));
   } catch {}
 
-  return envDetectOutput.parse({ os, cpu, gpu, ram_gb: ramGb, python, conda_env: condaEnv, cuda, installedPackages });
+  return envDetectOutput.parse({ os, cpu, gpu, ram_gb: ramGb, python, conda_env: condaEnv, cuda, installed_packages: installedPackages });
 }

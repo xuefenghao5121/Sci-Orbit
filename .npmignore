@@ -1,0 +1,23 @@
+# Source
+src/
+*.ts
+*.map
+tsconfig.json
+
+# Tests
+__tests__/
+*.test.ts
+*.spec.ts
+coverage/
+
+# Dev
+.github/
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Misc
+node_modules/
+.DS_Store
+Thumbs.db

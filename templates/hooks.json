@@ -10,6 +10,17 @@
           }
         ],
         "description": "自动注入 conda 环境变量到 Bash 命令"
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ai4s-experiment-guard.sh"
+          }
+        ],
+        "description": "实验脚本运行前检查 GPU/内存/磁盘资源可用性",
+        "condition": "command matches experiments/*/scripts/"
       }
     ],
     "PostToolUse": [
@@ -22,6 +33,17 @@
           }
         ],
         "description": "检查 Bash 输出中的数值结果合理性（NaN/Inf/异常值）"
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ai4s-knowledge-extract.sh"
+          }
+        ],
+        "description": "从技术对话中自动提取知识条目存入记忆系统",
+        "condition": "output contains technical conclusions or corrections"
       }
     ]
   },
@@ -29,6 +51,38 @@
     "PreToolUse": "在 Bash 工具执行前触发，自动设置 AI4S 计算环境",
     "PostToolUse": "在 Bash 工具执行后触发，检查数值输出是否合理",
     "ai4s-env-inject.sh": "检测当前目录的 .ai4s/env.json，注入 conda 环境、LD_LIBRARY_PATH 等",
-    "ai4s-numeric-check.sh": "解析命令输出，检测 NaN、Inf、异常大/小值，发出警告"
+    "ai4s-numeric-check.sh": "解析命令输出，检测 NaN、Inf、异常大/小值，发出警告",
+    "ai4s-experiment-guard.sh": "实验运行前检查资源可用性，防止并发资源冲突",
+    "ai4s-knowledge-extract.sh": "对话结束后提取技术知识条目，自动入库"
+  },
+  "phase3_hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ai4s-constrain-check.sh"
+          }
+        ],
+        "description": "数值计算后自动执行物理约束检查（量纲/守恒/范围/代码安全）",
+        "condition": "output contains numeric results"
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ai4s-feedback-detect.sh"
+          }
+        ],
+        "description": "检测用户反馈信号（否定/纠正），自动记录到反馈系统",
+        "condition": "input contains correction signals"
+      }
+    ],
+    "_comments": {
+      "ai4s-constrain-check.sh": "调用 /constrain check 逻辑，检查数值结果物理合理性",
+      "ai4s-feedback-detect.sh": "解析用户消息中的反馈信号，记录到 .ai4s/feedback/"
+    }
   }
 }

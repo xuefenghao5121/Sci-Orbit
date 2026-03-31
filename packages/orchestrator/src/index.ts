@@ -1,25 +1,44 @@
 #!/usr/bin/env node
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerTools } from "./tools/index.js";
-import { registerResources } from "./resources/index.js";
 import { logger } from "./utils/logger.js";
 
+const BOOT_START = performance.now();
+
 async function main() {
-  const server = new McpServer({
-    name: "ai4s-orchestrator",
-    version: "0.1.0",
-  });
+  logger.info("ai4s-orchestrator v0.4.0 initializing...");
+  logger.info(`Node.js: ${process.version} | PID: ${process.pid}`);
 
-  registerTools(server);
-  registerResources(server);
+  const { configService } = await import("./services/config.js");
+  const errors = configService.validate();
+  if (errors.length > 0) {
+    logger.error("Config validation errors:", errors.join(", "));
+  }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  logger.info("ai4s-orchestrator MCP Server started on stdio");
+  // Import and run server
+  await import("./server.js");
+
+  const bootMs = Math.round(performance.now() - BOOT_START);
+  logger.info(`🚀 Cold boot completed in ${bootMs}ms`);
 }
 
+function setupGracefulShutdown(): void {
+  const shutdown = (signal: string) => {
+    logger.info(`Received ${signal}, shutting down gracefully...`);
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("uncaughtException", (err) => {
+    logger.error("Uncaught exception:", err);
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (reason) => {
+    logger.error("Unhandled rejection:", reason);
+  });
+}
+
+setupGracefulShutdown();
 main().catch((err) => {
   logger.error("Fatal error:", err);
   process.exit(1);

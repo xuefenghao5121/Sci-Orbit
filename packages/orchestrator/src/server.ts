@@ -7,16 +7,19 @@ import { registerResources } from "./resources/index.js";
 import { logger } from "./utils/logger.js";
 
 async function main() {
+  logger.info("Starting ai4s-orchestrator v0.4.0...");
+
   const server = new McpServer({
     name: "ai4s-orchestrator",
-    version: "0.1.0",
+    version: "0.4.0",
   });
 
-  registerTools(server);
   registerResources(server);
+  await registerTools(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
   logger.info("ai4s-orchestrator MCP Server started on stdio");
 }
 

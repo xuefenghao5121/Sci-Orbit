@@ -1,0 +1,17 @@
+export { ConfigService, configService, AI4SConfig, DEFAULT_CONFIG } from "./config.js";
+export { StorageService, storageService, StorageRecord } from "./storage.js";
+export { LLMClientService, llmClient, LLMMessage, LLMOptions, LLMResponse } from "./llm-client.js";
+export { PaperParserService, paperParser, PaperNote } from "./paper-parser.js";
+export { ExperimentManagerService, experimentManager, ExperimentResult, ExperimentConfig, ExperimentStatus } from "./experiment-manager.js";
+export { KnowledgeManagerService, knowledgeManager, KnowledgeEntry, ExportFormat } from "./knowledge-manager.js";
+export { EnvironmentDetectorService, environmentDetector, EnvironmentInfo } from "./environment-detector.js";
+export { HPCManager } from "./hpc/index.js";
+export type { HPCBackend, JobConfig, JobStatus, JobInfo, JobFilter, JobLog, JobResources, HPCAdapter } from "./hpc/index.js";
+export { TrainingManager, ConfigGenerator, CheckpointManager } from "./finetune/index.js";
+export type { TrainingConfig, TrainingStatus, DatasetInfo, EvalResult, ResourceInfo } from "./finetune/index.js";
+export { ServerManager, ModelManager } from "./inference/index.js";
+export type { InferenceEngine, ServerParams, ServiceInfo, HealthStatus, ModelInfo, InferenceResult } from "./inference/index.js";
+export { ConstraintEngine } from "./constraints/index.js";
+export type { CheckReport, DimensionCheckResult, ConservationCheckResult, RangeCheckResult, CodeCheckResult } from "./constraints/index.js";
+export { FeedbackCollector, FeedbackApplier } from "./feedback/index.js";
+export type { Feedback, FeedbackType, FeedbackFilter } from "./feedback/index.js";

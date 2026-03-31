@@ -1,14 +1,28 @@
 {
   "name": "@ai4s/cli",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "AI4S CLI - Install/uninstall ai4s-orchestrator for Claude Code",
   "type": "module",
   "bin": {
     "ai4s": "dist/index.js"
   },
+  "files": ["dist/", "README.md"],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "cli",
+    "mcp",
+    "claude-code",
+    "ai4s",
+    "scientific-computing"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xuefenghao5121/ai4s-cli"
   },
   "dependencies": {
     "commander": "^13.0.0",
@@ -18,5 +32,8 @@
     "typescript": "^5.7.0",
     "@types/node": "^22.0.0",
     "@types/fs-extra": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

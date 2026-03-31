@@ -68,12 +68,111 @@
       "chmod": 755
     }
   ],
+  "phase2_files": [
+    {
+      "src": "skills/ai4s-debate/SKILL.md",
+      "dst": "skills/ai4s-debate/SKILL.md",
+      "description": "辩论技能"
+    },
+    {
+      "src": "skills/ai4s-paper/SKILL.md",
+      "dst": "skills/ai4s-paper/SKILL.md",
+      "description": "论文工作流技能"
+    },
+    {
+      "src": "skills/ai4s-exp/SKILL.md",
+      "dst": "skills/ai4s-exp/SKILL.md",
+      "description": "实验工作流技能"
+    },
+    {
+      "src": "skills/ai4s-project/SKILL.md",
+      "dst": "skills/ai4s-project/SKILL.md",
+      "description": "项目管理技能"
+    },
+    {
+      "src": "skills/ai4s-memory/SKILL.md",
+      "dst": "skills/ai4s-memory/SKILL.md",
+      "description": "记忆管理技能"
+    },
+    {
+      "src": "skills/ai4s-env/SKILL.md",
+      "dst": "skills/ai4s-env/SKILL.md",
+      "description": "环境管理技能"
+    },
+    {
+      "src": "skills/ai4s-learn/SKILL.md",
+      "dst": "skills/ai4s-learn/SKILL.md",
+      "description": "自动学习技能"
+    },
+    {
+      "src": "skills/WORKFLOWS.md",
+      "dst": "skills/WORKFLOWS.md",
+      "description": "工作流串联文档"
+    },
+    {
+      "src": "agents/ai4s-executor.md",
+      "dst": "agents/ai4s-executor.md",
+      "description": "执行者 Agent"
+    },
+    {
+      "src": "agents/ai4s-deployer.md",
+      "dst": "agents/ai4s-deployer.md",
+      "description": "部署者 Agent"
+    }
+  ],
+  "phase3_files": [
+    {
+      "src": "skills/ai4s-finetune/SKILL.md",
+      "dst": "skills/ai4s-finetune/SKILL.md",
+      "description": "微调工作流技能"
+    },
+    {
+      "src": "skills/ai4s-constrain/SKILL.md",
+      "dst": "skills/ai4s-constrain/SKILL.md",
+      "description": "物理约束检查技能"
+    },
+    {
+      "src": "skills/ai4s-science/SKILL.md",
+      "dst": "skills/ai4s-science/SKILL.md",
+      "description": "科学计算工具技能"
+    },
+    {
+      "src": "skills/ai4s-infer/SKILL.md",
+      "dst": "skills/ai4s-infer/SKILL.md",
+      "description": "推理服务管理技能"
+    },
+    {
+      "src": "skills/ai4s-hpc/SKILL.md",
+      "dst": "skills/ai4s-hpc/SKILL.md",
+      "description": "HPC 任务管理技能"
+    },
+    {
+      "src": "skills/ai4s-feedback/SKILL.md",
+      "dst": "skills/ai4s-feedback/SKILL.md",
+      "description": "反馈学习技能"
+    },
+    {
+      "src": "agents/ai4s-scientist.md",
+      "dst": "agents/ai4s-scientist.md",
+      "description": "科学计算专家 Agent"
+    }
+  ],
   "uninstall": {
     "files_to_remove": [
       "skills/ai4s-plan/SKILL.md",
       "skills/ai4s-status/SKILL.md",
+      "skills/ai4s-debate/SKILL.md",
+      "skills/ai4s-paper/SKILL.md",
+      "skills/ai4s-exp/SKILL.md",
+      "skills/ai4s-project/SKILL.md",
+      "skills/ai4s-memory/SKILL.md",
+      "skills/ai4s-env/SKILL.md",
+      "skills/ai4s-learn/SKILL.md",
+      "skills/WORKFLOWS.md",
       "agents/ai4s-planner.md",
       "agents/ai4s-reviewer.md",
+      "agents/ai4s-executor.md",
+      "agents/ai4s-deployer.md",
       "scripts/ai4s-env-inject.sh",
       "scripts/ai4s-numeric-check.sh"
     ],

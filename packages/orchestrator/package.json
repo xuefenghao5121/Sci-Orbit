@@ -1,16 +1,34 @@
 {
   "name": "@ai4s/orchestrator",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "AI4S MCP Server - Claude Code orchestrator for scientific computing",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "ai4s-orchestrator": "dist/index.js"
   },
+  "files": ["dist/", "README.md"],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "scientific-computing",
+    "ai4s",
+    "llm",
+    "machine-learning",
+    "fine-tuning",
+    "orchestrator"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xuefenghao5121/ai4s-cli"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1"
@@ -18,5 +36,8 @@
   "devDependencies": {
     "typescript": "^5.7.0",
     "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

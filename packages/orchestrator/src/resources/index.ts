@@ -1,26 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerAi4sStatusResource } from "./ai4s-status.js";
+import { registerPaperNotesResource } from "./paper-notes.js";
+import { registerExperimentResultsResource } from "./experiment-results.js";
+import { registerKnowledgeBaseResource } from "./knowledge-base.js";
+import { registerInferenceStatusResource } from "./inference-status.js";
 
 export function registerResources(server: McpServer): void {
-  server.resource(
-    "ai4s-status",
-    "ai4s://status",
-    async () => ({
-      contents: [
-        {
-          uri: "ai4s://status",
-          mimeType: "application/json",
-          text: JSON.stringify(
-            {
-              version: "0.1.0",
-              status: "running",
-              tools: ["classify_task", "generate_plan"],
-              mode: "plan-first",
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    })
-  );
+  registerAi4sStatusResource(server);
+  registerPaperNotesResource(server);
+  registerExperimentResultsResource(server);
+  registerKnowledgeBaseResource(server);
+  registerInferenceStatusResource(server);
 }

@@ -1,0 +1,22 @@
+{
+  "name": "@ai4s/cli",
+  "version": "0.1.0",
+  "description": "AI4S CLI - Install/uninstall ai4s-orchestrator for Claude Code",
+  "type": "module",
+  "bin": {
+    "ai4s": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "fs-extra": "^11.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "@types/fs-extra": "^11.0.0"
+  }
+}

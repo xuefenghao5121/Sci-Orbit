@@ -1,0 +1,22 @@
+{
+  "name": "@ai4s/orchestrator",
+  "version": "0.1.0",
+  "description": "AI4S MCP Server - Claude Code orchestrator for scientific computing",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "ai4s-orchestrator": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

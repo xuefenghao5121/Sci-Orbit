@@ -1,0 +1,88 @@
+{
+  "version": "0.1.0",
+  "name": "ai4s-cli",
+  "description": "AI4S 科学计算扩展 — Claude Code 可插拔扩展层",
+  "install_root": ".claude",
+  "files": [
+    {
+      "src": "skills/ai4s-plan/SKILL.md",
+      "dst": "skills/ai4s-plan/SKILL.md",
+      "description": "Plan-First 规划技能"
+    },
+    {
+      "src": "skills/ai4s-status/SKILL.md",
+      "dst": "skills/ai4s-status/SKILL.md",
+      "description": "状态查询技能"
+    },
+    {
+      "src": "agents/ai4s-planner.md",
+      "dst": "agents/ai4s-planner.md",
+      "description": "规划 Agent 角色定义"
+    },
+    {
+      "src": "agents/ai4s-reviewer.md",
+      "dst": "agents/ai4s-reviewer.md",
+      "description": "审查 Agent 角色定义"
+    },
+    {
+      "src": "templates/system-prompt.md",
+      "dst": "CLAUDE.md.ai4s",
+      "description": "AI4S 行为准则注入（追加到 CLAUDE.md）"
+    },
+    {
+      "src": "templates/hooks.json",
+      "dst": "settings.json.ai4s",
+      "description": "Hooks 配置（合并到 settings.json）",
+      "merge": true
+    }
+  ],
+  "directories": [
+    {
+      "path": ".ai4s/plans",
+      "description": "计划存储"
+    },
+    {
+      "path": ".ai4s/experiments",
+      "description": "实验记录"
+    },
+    {
+      "path": ".ai4s/papers",
+      "description": "论文笔记"
+    },
+    {
+      "path": ".ai4s/cache",
+      "description": "缓存"
+    }
+  ],
+  "hooks_scripts": [
+    {
+      "src": "scripts/ai4s-env-inject.sh",
+      "dst": "scripts/ai4s-env-inject.sh",
+      "description": "PreToolUse: conda 环境注入",
+      "chmod": 755
+    },
+    {
+      "src": "scripts/ai4s-numeric-check.sh",
+      "dst": "scripts/ai4s-numeric-check.sh",
+      "description": "PostToolUse: 数值合理性检查",
+      "chmod": 755
+    }
+  ],
+  "uninstall": {
+    "files_to_remove": [
+      "skills/ai4s-plan/SKILL.md",
+      "skills/ai4s-status/SKILL.md",
+      "agents/ai4s-planner.md",
+      "agents/ai4s-reviewer.md",
+      "scripts/ai4s-env-inject.sh",
+      "scripts/ai4s-numeric-check.sh"
+    ],
+    "files_to_clean": [
+      "CLAUDE.md",
+      "settings.json"
+    ],
+    "dirs_to_remove": [
+      ".ai4s"
+    ]
+  }
+}

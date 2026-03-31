@@ -1,0 +1,7 @@
+{
+  "name": "@ai4s/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "description": "AI4S - AI for Scientific Computing Orchestrator"
+}

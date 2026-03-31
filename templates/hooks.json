@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ai4s-env-inject.sh"
+          }
+        ],
+        "description": "自动注入 conda 环境变量到 Bash 命令"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ai4s-numeric-check.sh"
+          }
+        ],
+        "description": "检查 Bash 输出中的数值结果合理性（NaN/Inf/异常值）"
+      }
+    ]
+  },
+  "_comments": {
+    "PreToolUse": "在 Bash 工具执行前触发，自动设置 AI4S 计算环境",
+    "PostToolUse": "在 Bash 工具执行后触发，检查数值输出是否合理",
+    "ai4s-env-inject.sh": "检测当前目录的 .ai4s/env.json，注入 conda 环境、LD_LIBRARY_PATH 等",
+    "ai4s-numeric-check.sh": "解析命令输出，检测 NaN、Inf、异常大/小值，发出警告"
+  }
+}

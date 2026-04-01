@@ -3,6 +3,7 @@
  */
 
 import { AI4SError, AI4SErrorCode } from "./errors.js";
+import { logger } from "./logger.js";
 
 // --- LLM fallback ---
 
@@ -34,12 +35,12 @@ export async function callLLMWithFallback(opts: LLMCallOptions): Promise<string>
     try {
       return await provider.call(opts);
     } catch (err) {
-      console.warn(`[fallback] LLM provider "${provider.name}" failed: ${(err as Error).message}`);
+      logger.error(`[fallback] LLM provider "${provider.name}" failed: ${(err as Error).message}`);
     }
   }
 
   if (ruleBasedHandler) {
-    console.warn("[fallback] All LLM providers failed, using rule-based fallback");
+    logger.info("[fallback] All LLM providers failed, using rule-based fallback");
     return ruleBasedHandler(opts.prompt);
   }
 
@@ -62,7 +63,7 @@ export async function runWithComputeFallback<T>(task: ComputeTask<T>): Promise<{
     const result = await task.run("gpu");
     return { result, backend: "gpu" };
   } catch (err) {
-    console.warn(`[fallback] GPU execution failed: ${(err as Error).message}, falling back to CPU`);
+    logger.info(`[fallback] GPU execution failed: ${(err as Error).message}, falling back to CPU`);
     const result = await task.run("cpu");
     return { result, backend: "cpu" };
   }
@@ -90,7 +91,7 @@ export async function searchWithFallback(
       const results = await provider.search(query, limit);
       if (results.length > 0) return results;
     } catch (err) {
-      console.warn(`[fallback] Search provider "${provider.name}" failed: ${(err as Error).message}`);
+      logger.error(`[fallback] Search provider "${provider.name}" failed: ${(err as Error).message}`);
     }
   }
 

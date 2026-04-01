@@ -31,6 +31,33 @@ export async function finetunePrepare(input: FinetunePrepareInput): Promise<Fine
 }
 
 function generatePrepareScript(source: FinetunePrepareInput['data_source'], format: string, outputDir: string): string {
+  // Check for unsupported data source types
+  if (source.type === 'knowledge_base_id' || source.type === 'paper_id') {
+    // Generate a script that will output a clear error message
+    return `#!/usr/bin/env python3
+"""Data preparation script - ERROR: Unsupported data source type"""
+
+import sys
+import json
+
+SOURCE_TYPE = "${source.type}"
+SOURCE_PATH = "${source.path}"
+
+def main():
+    error_msg = f"ERROR: Data source type '{SOURCE_TYPE}' is not yet supported. Use 'directory' type instead."
+    print(error_msg, file=sys.stderr)
+    print("\\nSupported data source types:", file=sys.stderr)
+    print("  - directory: Local directory containing JSON/JSONL files", file=sys.stderr)
+    print("\\nExample usage:", file=sys.stderr)
+    print('  data_source: { type: "directory", path: "/path/to/training/data" }', file=sys.stderr)
+    sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+`;
+  }
+
+  // Original script for supported 'directory' type
   return `#!/usr/bin/env python3
 """Auto-generated data preparation script for fine-tuning."""
 import json, os, hashlib

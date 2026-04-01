@@ -1,23 +1,15 @@
 import type { CheckDimensionInput, CheckDimensionOutput } from './schemas.js';
+import { ConstraintEngine } from '../../services/constraints/engine.js';
 
-// Simple dimension analysis: parse equation and check dimensional consistency
-const DIM_OPS: Record<string, (dims: string[], dims2: string[]) => string> = {
-  '+': (a, b) => a[0] === b[0] ? a[0] : 'INCONSISTENT',
-  '-': (a, b) => a[0] === b[0] ? a[0] : 'INCONSISTENT',
-  '*': (a, b) => `${a[0]}*${b[0]}`,
-  '/': (a, b) => `${a[0]}/${b[0]}`,
-  '^': (a, b) => {
-    if (b[0] === '1') return a[0];
-    return `${a[0]}^${b[0]}`;
-  },
-};
+const constraintEngine = new ConstraintEngine();
 
 export async function checkDimension(input: CheckDimensionInput): Promise<CheckDimensionOutput> {
   const { equation, variables } = input;
 
   // Check if all variables in equation have dimensions defined
   const usedVars = equation.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
-  const missing = usedVars.filter(v => !variables[v] && !['sin', 'cos', 'tan', 'log', 'exp', 'sqrt', 'pi', 'abs'].includes(v));
+  const mathFunctions = ['sin', 'cos', 'tan', 'log', 'exp', 'sqrt', 'pi', 'abs', 'ln', 'max', 'min'];
+  const missing = usedVars.filter(v => !variables[v] && !mathFunctions.includes(v));
 
   if (missing.length > 0) {
     return {
@@ -27,11 +19,28 @@ export async function checkDimension(input: CheckDimensionInput): Promise<CheckD
     };
   }
 
-  // Simple rule-based analysis
-  const analysis = `Equation: ${equation}\nVariables: ${JSON.stringify(variables)}\nAll variables have dimension definitions.`;
+  // Use ConstraintEngine for actual dimensional analysis
+  const result = constraintEngine.checkDimension(equation, variables);
+
+  const analysis = result.details 
+    ? `Equation: ${equation}\nVariables: ${JSON.stringify(variables)}\nLHS dimension: ${result.details.split(',')[0]?.replace('LHS: ', '') || 'unknown'}\nRHS dimension: ${result.details.split(',')[1]?.replace(' RHS: ', '') || 'unknown'}`
+    : `Equation: ${equation}\nVariables: ${JSON.stringify(variables)}`;
+
+  const suggestions: string[] = [];
+  if (!result.passed && result.error) {
+    suggestions.push(result.error);
+    // Try to provide helpful suggestions based on common mistakes
+    if (result.error.includes('Dimension mismatch')) {
+      suggestions.push('Check if all terms have consistent units');
+      suggestions.push('Verify conversion factors are included');
+    }
+  } else {
+    suggestions.push('Dimensional analysis passed - equation is dimensionally consistent');
+  }
+
   return {
-    is_consistent: true,
+    is_consistent: result.passed,
     analysis,
-    suggestions: ['For full verification, run with dimensional analysis engine'],
+    suggestions,
   };
 }

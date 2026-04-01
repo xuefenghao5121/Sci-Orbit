@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import os from "node:os";
+import type { HPCAdapter } from "../hpc/types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -63,7 +64,7 @@ function ensureDir(dir: string): void {
 }
 
 export class TrainingManager {
-  private hpcManager: any;
+  private hpcManager: HPCAdapter | null = null;
   private workDir: string;
   private statusMap = new Map<string, TrainingStatus>();
 
@@ -72,7 +73,7 @@ export class TrainingManager {
     ensureDir(this.workDir);
   }
 
-  setHPCManager(manager: unknown): void {
+  setHPCManager(manager: HPCAdapter): void {
     this.hpcManager = manager;
   }
 
@@ -107,7 +108,7 @@ export class TrainingManager {
     status.status = 'running';
 
     if (this.hpcManager) {
-      await this.hpcManager.submitJob({
+      await this.hpcManager.submit({
         name: jobId,
         script: `cd ${outputDir} && llamafactory-cli train config.yaml`,
         workdir: outputDir,

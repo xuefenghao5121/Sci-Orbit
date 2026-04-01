@@ -13,7 +13,7 @@ export interface EnvironmentInfo {
 export class EnvironmentDetectorService {
   detect(): EnvironmentInfo {
     const info: EnvironmentInfo = {
-      os: { platform: process.platform, arch: process.arch, release: process.version },
+      os: { platform: process.platform, arch: process.arch, release: require("node:os").release() },
       cpu: { model: "", cores: 0 },
       memory: { totalGb: 0, freeGb: 0 },
       node: { version: process.version },

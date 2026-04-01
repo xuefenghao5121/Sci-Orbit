@@ -2,6 +2,8 @@
  * Exponential backoff retry with idempotency support
  */
 
+import { logger } from "./logger.js";
+
 export interface RetryOptions {
   maxRetries?: number;
   baseDelay?: number;
@@ -49,7 +51,7 @@ export async function retry<T>(
       if (!opts.retryableCheck(lastError)) break;
 
       const delay = calculateDelay(attempt, opts);
-      console.warn(
+      logger.info(
         `[retry] Attempt ${attempt + 1}/${opts.maxRetries} failed: ${lastError.message}. Retrying in ${Math.round(delay)}ms...`
       );
       await sleep(delay);

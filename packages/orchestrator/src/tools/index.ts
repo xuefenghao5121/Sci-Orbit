@@ -32,22 +32,86 @@ async function loadAllTools(): Promise<ToolDefinition[]> {
   return loadedTools;
 }
 
+/**
+ * Convert JSON Schema property to Zod type with full feature support
+ */
+function schemaPropertyToZod(prop: unknown): z.ZodType {
+  const p = (prop || {}) as Record<string, unknown>;
+  const propType = p.type as string;
+  const propDesc = (p.description as string) || "";
+
+  let schema: z.ZodType;
+
+  switch (propType) {
+    case "string": {
+      if (p.enum && Array.isArray(p.enum)) {
+        schema = z.enum(p.enum as [string, ...string[]]).describe(propDesc);
+      } else {
+        schema = z.string().describe(propDesc);
+      }
+      break;
+    }
+    case "number":
+    case "integer": {
+      schema = z.number().describe(propDesc);
+      break;
+    }
+    case "boolean": {
+      schema = z.boolean().describe(propDesc);
+      break;
+    }
+    case "array": {
+      if (p.items && typeof p.items === 'object') {
+        schema = z.array(schemaPropertyToZod(p.items)).describe(propDesc);
+      } else {
+        schema = z.array(z.unknown()).describe(propDesc);
+      }
+      break;
+    }
+    case "object": {
+      if (p.properties && typeof p.properties === 'object') {
+        const nestedShape: Record<string, z.ZodType> = {};
+        for (const [key, val] of Object.entries(p.properties)) {
+          nestedShape[key] = schemaPropertyToZod(val);
+        }
+        schema = z.object(nestedShape).describe(propDesc);
+      } else {
+        schema = z.record(z.string(), z.unknown()).describe(propDesc);
+      }
+      break;
+    }
+    default:
+      schema = z.unknown().describe(propDesc);
+  }
+
+  if (p.default !== undefined) {
+    schema = schema.default(p.default);
+  }
+
+  return schema;
+}
+
 export async function registerTools(server: McpServer): Promise<void> {
   const allTools = await loadAllTools();
 
   for (const tool of allTools) {
-    const schema = tool.inputSchema as any;
+    const schema = tool.inputSchema as Record<string, unknown>;
     const shape: Record<string, z.ZodType> = {};
+    const required = new Set(schema.required as string[] || []);
+    
     if (schema.type === "object" && schema.properties) {
-      for (const [key, val] of Object.entries(schema.properties)) {
-        const prop = val as any;
-        if (prop.type === "string") shape[key] = z.string().describe(prop.description || "");
-        else if (prop.type === "number") shape[key] = z.number().describe(prop.description || "");
-        else if (prop.type === "boolean") shape[key] = z.boolean().describe(prop.description || "");
-        else if (prop.type === "array") shape[key] = z.array(z.unknown()).describe(prop.description || "");
-        else shape[key] = z.unknown().describe(prop.description || "");
+      for (const [key, val] of Object.entries(schema.properties as Record<string, unknown>)) {
+        const prop = val as Record<string, unknown>;
+        let zodType = schemaPropertyToZod(prop);
+        
+        // Make optional if not in required array
+        if (!required.has(key)) {
+          zodType = zodType.optional();
+        }
+        shape[key] = zodType;
       }
     }
+    
     server.tool(
       tool.name,
       tool.description,

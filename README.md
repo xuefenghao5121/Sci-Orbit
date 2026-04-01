@@ -1,193 +1,249 @@
-# AI4S — AI for Scientific Computing
+# Sci-Orbit
 
-> 🔬 Claude Code 的科学计算编排引擎：38 个 MCP 工具 · 16 个 Skill · 5 个 Agent
+> 🔬 Scientific Computing Enhancement Toolkit for AI Coding Agents — bridging Claude Code, OpenClaw, and beyond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.5.0--dev-orange.svg)]()
+[![Tests](https://img.shields.io/badge/tests-104%2F104-brightgreen.svg)]()
+
+## What is Sci-Orbit?
+
+Sci-Orbit is an **AI4S (AI for Scientific Computing) enhancement toolkit** that fills the gap between general-purpose AI coding agents and the specialized needs of scientific computing workflows.
+
+**The problem**: Claude Code, OpenClaw, and similar agents excel at software engineering, but struggle with scientific computing — where implicit environment dependencies, complex physical parameters, and opaque binary data formats cause silent failures and wasted GPU hours.
+
+**Our solution**: A plugin-based toolkit that gives AI coding agents **domain intelligence** for scientific computing — environment awareness, parameter reasoning, and scientific data understanding.
+
+## Why Sci-Orbit?
+
+| Challenge | Without Sci-Orbit | With Sci-Orbit |
+|-----------|------------------|----------------|
+| Environment setup | 40%+ failures from env issues | Auto-detect GPU/CUDA/compilers/MPI |
+| Parameter errors | Implicit params missed → wrong results | Infer hidden params with confidence scores |
+| Scientific data | Claude can't read POSCAR/HDF5 | Auto-summarize into LLM-readable text |
+| Reproducibility | <1/3 of AI research reproducible | Environment snapshots + diff tracking |
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│              Platform Adaptation Layer                │
+│  ┌─────────────────┐    ┌────────────────────────┐   │
+│  │  Claude Code    │    │  OpenClaw              │   │
+│  │  MCP Server +   │    │  Skill + SubAgent +    │   │
+│  │  Slash Commands │    │  Cron + Memory         │   │
+│  └────────┬────────┘    └──────────┬─────────────┘   │
+├───────────┴────────────────────────┴─────────────────┤
+│              Agent Orchestration Layer                │
+│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐     │
+│  │ Plan-    │ │ Debate   │ │ Finetune         │     │
+│  │ First    │ │ Engine   │ │ Engine           │     │
+│  │ Engine   │ │          │ │                  │     │
+│  └──────────┘ └──────────┘ └──────────────────┘     │
+├──────────────────────────────────────────────────────┤
+│              MCP Tools Layer (38+ tools)              │
+│  Environment │ Parameters │ Data │ Papers │ Experiments │
+└──────────────────────────────────────────────────────┘
+```
+
+## Core Capabilities
+
+### 🌍 Environment Intelligence
+
+Automatically detects and snapshots the full computing environment:
+
+- **Hardware**: GPU model, driver, CUDA version, VRAM, utilization
+- **Software**: Compilers (GCC/G++/GFortran), MPI, Python version
+- **Packages**: NumPy, PyTorch, ASE, RDKit, PySCF, OpenMM, JAX...
+- **Export**: Generate `environment.yml` (Conda) or `Dockerfile` for one-click reproducibility
+- **Diff**: Compare two environments and assess risk level (low/medium/high/critical)
+
+```bash
+# MCP tool call
+env_snapshot(format="conda")     # → environment.yml
+env_diff(snapshot_a, snapshot_b) # → risk assessment
+```
+
+### 🔧 Parameter Intelligence
+
+Infer implicit parameters that scientific tools require but AI agents don't know about:
+
+- **Templates**: VASP, LAMMPS, ABACUS parameter knowledge bases
+- **Inference**: Auto-detect metal vs. semiconductor → set correct smearing
+- **Confidence**: Every inferred parameter has a confidence score (0-1)
+- **Validation**: Check constraints (e.g., `ismear=0` requires `sigma < 0.1`)
+- **Generation**: Auto-generate INCAR / INPUT files from completed parameters
+
+```bash
+param_complete(tool="vasp_dft", params={system: "Cu", encut: 500})
+# → adds implicit: ismear=1, sigma=0.2, prec=accurate (metal detected!)
+# → warning: "Cu appears metallic, using ismear=1 (confidence: 70%)"
+
+param_generate_incar(params, output_path="INCAR")
+```
+
+### 📊 Scientific Data Understanding
+
+Translate opaque scientific file formats into text that LLMs can actually understand:
+
+| Format | What we extract |
+|--------|----------------|
+| **POSCAR/CONTCAR** | Crystal system, lattice constant, atom count, coordinate type |
+| **CIF** | Chemical formula, space group, cell parameters |
+| **VASP OUTCAR** | Total energy, convergence status, max force |
+| **ABACUS log** | Final energy, Fermi level, SCF convergence |
+| **XYZ** | Molecular formula, atom count |
+| **JSON/YAML** | Schema summary |
+
+```bash
+data_summarize(file_path="OUTCAR")
+# → "Cu system, E₀=-5.43 eV, max force=0.005 eV/Å, ✅ converged"
+```
+
+## Supported Platforms
+
+### Claude Code
+
+```bash
+# Install as MCP server
+claude mcp add sci-orbit -- npx @sci-orbit/orchestrator
+
+# Use naturally
+claude> 帮我跑一个硅的 DFT 计算
+# Claude automatically: env_snapshot → param_complete → prepare_input → submit
+```
+
+### OpenClaw
+
+```bash
+# Install as Skill
+openclaw skill install sci-orbit
+
+# Auto-activates Plan-First workflow + Cron monitoring
+```
+
+## Tool Reference (38+ MCP Tools)
+
+### Environment (4 tools)
+| Tool | Description |
+|------|-------------|
+| `env_detect` | Detect runtime environment |
+| `env_setup` | Generate environment configuration |
+| `env_snapshot` | Collect full reproducibility snapshot |
+| `env_diff` | Compare two environments |
+
+### Parameters (5 tools)
+| Tool | Description |
+|------|-------------|
+| `param_complete` | Auto-complete implicit parameters |
+| `param_validate` | Validate parameters without completion |
+| `param_list_templates` | List supported tool templates |
+| `param_generate_incar` | Generate VASP INCAR file |
+| `param_generate_abacus_input` | Generate ABACUS INPUT file |
+
+### Data Summary (3 tools)
+| Tool | Description |
+|------|-------------|
+| `data_summarize` | Summarize scientific data file |
+| `data_summarize_dir` | Batch summarize directory |
+| `data_supported_formats` | List supported formats |
+
+### Plan-First (4 tools)
+`classify_task` · `generate_plan` · `validate_plan` · `review_plan`
+
+### Debate (3 tools)
+`debate_submit` · `debate_round` · `debate_resolve`
+
+### Papers (3 tools)
+`paper_parse` · `paper_compare` · `paper_implement`
+
+### Experiments (4 tools)
+`exp_plan` · `exp_run` · `exp_monitor` · `exp_compare`
+
+### Knowledge Base (5 tools)
+`kb_create` · `kb_add` · `kb_search` · `kb_update` · `kb_export`
+
+### Finetune (6 tools)
+`finetune_prepare` · `finetune_start` · `finetune_monitor` · `finetune_resume` · `finetune_merge` · `finetune_evaluate`
+
+### Science (4 tools)
+`science_pyscf` · `science_rdkit` · `science_openmm` · `science_jupyter`
+
+### Inference (3 tools)
+`infer_start` · `infer_test` · `infer_stop`
+
+### Constraints (4 tools)
+`check_dimension` · `check_conservation` · `check_range` · `check_code`
+
+## Quick Start
+
+```bash
+# Clone
+git clone git@github.com:xuefenghao5121/Sci-Orbit.git
+cd Sci-Orbit
+
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Test
+npm test  # 104/104 passing
+
+# Use with Claude Code
+claude mcp add sci-orbit -- node dist/server.js
+```
+
+## Development Roadmap
+
+### Phase 1 — Tool Intelligence ✅ (Current)
+- [x] Environment snapshot & diff
+- [x] Parameter auto-completion (VASP, LAMMPS, ABACUS)
+- [x] Scientific data format summarizer
+- [x] 38 MCP tools, 104/104 tests passing
+
+### Phase 2 — Agent Orchestration 🚧
+- [ ] Plan-First state machine (classify → generate → validate → review → iterate)
+- [ ] Dual-model debate engine (proposer ↔ critic + judge)
+- [ ] Finetune execution engine (LLaMA Factory + GPU monitoring + resume)
+
+### Phase 3 — Platform Integration
+- [ ] OpenClaw Skill (SKILL.md + subAgent + Cron)
+- [ ] Claude Code Extension (slash commands)
+- [ ] Multi-platform benchmark suite
+
+### Phase 4 — Advanced Features
+- [ ] More tool templates (GPAW, CP2K, Quantum ESPRESSO)
+- [ ] Adaptive parameter inference (learn from user corrections)
+- [ ] GPU resource scheduling
+- [ ] Collaborative knowledge sharing
+
+## Research Foundation
+
+Built on insights from:
+
+- **Agent4S** (arXiv:2506.23692) — Five-level AI4S agent classification
+- **DSWizard** — Plan-First mechanism: accuracy 13% → 55%
+- **Deploy-Master** — Dual-model debate: deployment success 50% → 95%
+- **CORE-Bench** — AI4S evaluation benchmark
+
+## Team
+
+Sci-Orbit is developed by the **灵码团队 (Lingma Team)**:
+
+| Member | Role | Focus |
+|--------|------|-------|
+| 灵枢 (Lingshu) | Architect | System design & orchestration |
+| 灵匠 (Lingjiang) | Engineer | Core implementation |
+| 灵令 (Lingling) | Planner | Workflow & pipeline design |
+| 灵影 (Lingying) | Researcher | Paper analysis & knowledge |
+| 灵脉 (Lingmai) | Operator | HPC & deployment |
+
+## License
+
+[MIT License](LICENSE)
 
 ---
 
-## ✨ 功能特性
-
-### Phase 1 — MVP 基础
-- ✅ Plan-First 工作流（分类 → 规划 → 验证 → 审查）
-- ✅ 论文解析与结构化提取
-- ✅ 实验管理（计划 → 运行 → 监控 → 对比）
-- ✅ 环境检测与自动配置
-
-### Phase 2 — 核心功能
-- ✅ 辩论系统（提案者/批评者结构化辩论）
-- ✅ 领域知识库（创建/添加/搜索/更新/导出）
-- ✅ 科学计算集成（PySCF、OpenMM、RDKit、Jupyter）
-- ✅ 约束检查引擎（量纲/守恒/范围/代码）
-
-### Phase 3 — 离线微调 + HPC
-- ✅ 离线微调流水线（LoRA/QLoRA/Full）
-- ✅ HPC 多后端（本地/SLURM/K8s）
-- ✅ 推理服务部署（vLLM/Ollama/llama.cpp）
-- ✅ 反馈收集系统
-
-### Phase 4 — 生产化
-- ✅ 安全层（输入校验、命令净化、速率限制）
-- ✅ 完整文档体系
-- ✅ 5 个端到端示例项目
-- ✅ 一键安装/卸载
-
-## 🚀 安装
-
-```bash
-npx @ai4s/cli init
-```
-
-安装后重启 Claude Code，使用 `/ai4s-status` 验证。
-
-## ⚡ 快速演示
-
-```bash
-claude
-> 帮我复现论文 "Attention Is All You Need" 中的 Transformer
-```
-
-AI4S 自动执行：任务分类 → 计划生成 → 论文解析 → 实验规划 → 代码生成
-
-## 🏗️ 架构
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Claude Code CLI                       │
-├─────────────────────────────────────────────────────────┤
-│  Agents          │  Skills          │  MCP Client       │
-│  (5 个)          │  (16 个)         │                   │
-├──────────────────┴──────────────────┴───────────────────┤
-│                   MCP Server                            │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐  │
-│  │ Tools   │ │Resources│ │Services │ │  Security   │  │
-│  │ (38个)  │ │ (6 URI) │ │ (12个)  │ │   Layer     │  │
-│  └─────────┘ └─────────┘ └─────────┘ └─────────────┘  │
-├─────────────────────────────────────────────────────────┤
-│  HPC Adapters  │  Inference Servers  │  Storage        │
-│  (local/slurm/k8s) │ (vllm/ollama/cpp) │ (filesystem) │
-└─────────────────────────────────────────────────────────┘
-```
-
-## 🔧 工具清单（38 个）
-
-### Plan-First（4）
-| 工具 | 说明 |
-|------|------|
-| `classify_task` | 任务分类（领域/类型/复杂度） |
-| `generate_plan` | 生成结构化分析计划 |
-| `validate_plan` | 验证计划结构完整性 |
-| `review_plan` | 科学性审查 |
-
-### 辩论系统（3）
-| 工具 | 说明 |
-|------|------|
-| `debate_submit` | 提交计划进行辩论 |
-| `debate_round` | 执行辩论轮次 |
-| `debate_resolve` | 解析辩论并生成共识计划 |
-
-### 论文工具（3）
-| 工具 | 说明 |
-|------|------|
-| `paper_parse` | 解析论文（标题/作者/摘要/公式） |
-| `paper_compare` | 对比多篇论文 |
-| `paper_implement` | 从论文生成代码原型 |
-
-### 实验管理（4）
-| 工具 | 说明 |
-|------|------|
-| `exp_plan` | 生成实验计划 |
-| `exp_run` | 生成运行脚本 |
-| `exp_monitor` | 监控实验进度 |
-| `exp_compare` | 对比实验结果 |
-
-### 环境管理（2）
-| 工具 | 说明 |
-|------|------|
-| `env_detect` | 检测运行环境 |
-| `env_setup` | 生成环境配置 |
-
-### 知识库（5）
-| 工具 | 说明 |
-|------|------|
-| `kb_create` | 创建知识库 |
-| `kb_add` | 添加知识条目 |
-| `kb_search` | 搜索知识 |
-| `kb_update` | 更新条目 |
-| `kb_export` | 导出训练数据 |
-
-### 微调（6）
-| 工具 | 说明 |
-|------|------|
-| `finetune_prepare` | 准备微调数据集 |
-| `finetune_start` | 启动微调 |
-| `finetune_monitor` | 监控训练 |
-| `finetune_resume` | 恢复训练 |
-| `finetune_merge` | 合并 LoRA 权重 |
-| `finetune_evaluate` | 评估模型 |
-
-### 科学计算（4）
-| 工具 | 说明 |
-|------|------|
-| `science_pyscf` | 量子化学计算 |
-| `science_rdkit` | 分子分析 |
-| `science_openmm` | 分子动力学 |
-| `science_jupyter` | Notebook 操作 |
-
-### 推理部署（3）
-| 工具 | 说明 |
-|------|------|
-| `infer_start` | 启动推理服务 |
-| `infer_test` | 测试推理质量 |
-| `infer_stop` | 停止推理服务 |
-
-### 约束检查（4）
-| 工具 | 说明 |
-|------|------|
-| `check_dimension` | 量纲一致性检查 |
-| `check_conservation` | 守恒定律验证 |
-| `check_range` | 物理量范围检查 |
-| `check_code` | 代码质量检查 |
-
-## 📋 Skill 清单（16 个）
-
-`ai4s-plan` · `ai4s-debate` · `ai4s-paper` · `ai4s-exp` · `ai4s-env` · `ai4s-memory` · `ai4s-finetune` · `ai4s-hpc` · `ai4s-infer` · `ai4s-science` · `ai4s-constrain` · `ai4s-learn` · `ai4s-feedback` · `ai4s-project` · `ai4s-status` · `ai4s-deploy`
-
-## 🤖 Agent 清单（5 个）
-
-| Agent | 职责 |
-|-------|------|
-| `ai4s-planner` | 任务分析与计划生成 |
-| `ai4s-executor` | 实验执行与监控 |
-| `ai4s-reviewer` | 科学审查与验证 |
-| `ai4s-scientist` | 领域知识推理 |
-| `ai4s-deployer` | 模型部署与推理 |
-
-## 📁 示例项目
-
-| 示例 | 场景 | 关键工具 |
-|------|------|----------|
-| [01-paper-reproduction](examples/01-paper-reproduction/) | 论文复现 | paper_parse → exp_plan → exp_run |
-| [02-fluid-simulation](examples/02-fluid-simulation/) | 流体模拟 | check_dimension → science_jupyter |
-| [03-model-finetuning](examples/03-model-finetuning/) | 模型微调 | kb_export → finetune_start → infer_start |
-| [04-hpc-deployment](examples/04-hpc-deployment/) | HPC 部署 | exp_run → hpc submit → collect |
-| [05-knowledge-accumulation](examples/05-knowledge-accumulation/) | 知识积累 | paper_parse → kb_add → kb_export |
-
-## 📚 文档
-
-- [快速开始](docs/getting-started.md)
-- [用户指南](docs/user-guide.md)
-- [配置参考](docs/configuration.md)
-- [开发者指南](docs/developer-guide.md)
-- [API 参考](docs/api-reference.md)
-- [更新日志](CHANGELOG.md)
-
-## 🤝 贡献
-
-欢迎贡献！请阅读 [开发者指南](docs/developer-guide.md) 了解项目结构和开发流程。
-
-## 📄 许可证
-
-[MIT License](LICENSE)
+*Sci-Orbit: Making AI coding agents scientifically literate.*

@@ -13,6 +13,8 @@ const TOOL_LOADERS: Array<() => Promise<import("./tool-registry.js").ToolDefinit
   () => import("./science/index.js").then((m) => m.scienceTools),
   () => import("./deploy/index.js").then((m) => m.deployTools),
   () => import("./constrain/index.js").then((m) => m.constrainTools),
+  () => import("./data-summary/index.js").then((m) => m.dataSummaryTools),
+  () => import("./param-complete/index.js").then((m) => m.paramCompleteTools),
 ];
 
 export interface ToolDefinition {

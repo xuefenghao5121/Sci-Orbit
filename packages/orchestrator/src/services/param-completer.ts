@@ -190,18 +190,20 @@ export class ParamCompleterService {
       }
     }
 
-    // 2. 补全隐式参数
+    // 2. 补全隐式参数（按模板定义的顺序，支持依赖）
+    const accumulatedParams = { ...userParams.params };
     for (const [key, rule] of Object.entries(template.implicit_params)) {
-      // 如果用户已显式指定，跳过
-      if (key in userParams.params) {
+      // 如果用户已显式指定或前面已推断出，跳过
+      if (key in accumulatedParams) {
         confidence[key] = 1.0;
         continue;
       }
 
-      // 尝试推断
-      const inferred = this.inferParam(key, rule, userParams.params, env);
+      // 尝试推断（使用累积的参数，包含已推断出的值）
+      const inferred = this.inferParam(key, rule, accumulatedParams, env);
       implicit[key] = inferred.value;
       confidence[key] = inferred.confidence;
+      accumulatedParams[key] = inferred.value; // 累积到后续推断
 
       if (inferred.confidence < 0.7) {
         warnings.push({

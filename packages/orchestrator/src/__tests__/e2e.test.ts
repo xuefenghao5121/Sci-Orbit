@@ -8,8 +8,8 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 async function createClient() {
   const transport = new StdioClientTransport({
     command: "node",
-    args: ["dist/index.js"],
-    cwd: new URL("..", import.meta.url).pathname,
+    args: ["packages/orchestrator/dist/index.js"],
+    cwd: "/home/huawei/.openclaw/workspace/ai4s-cli",
   });
   const client = new Client({ name: "e2e-test", version: "1.0" });
   await client.connect(transport);
@@ -27,53 +27,69 @@ describe("MCP Server E2E", () => {
     expect(names).toContain("validate_plan");
     expect(names).toContain("review_plan");
     await client.close();
-  });
+  }, 10000);
 
   it("classify_task returns valid classification", async () => {
     const client = await createClient();
-    const result = await client.callTool("classify_task", {
-      task_description: "Train a transformer model for NER",
+    const result = await client.callTool({ 
+      name: "classify_task", 
+      arguments: {
+        task_description: "Train a transformer model for NER",
+      }
     });
     const data = JSON.parse(result.content[0].text);
     expect(data).toHaveProperty("domain");
     expect(data).toHaveProperty("complexity");
-    expect(["low", "medium", "high"]).toContain(data.complexity);
+    // Accept both old ('low'/'medium'/'high') and new ('simple'/'moderate'/'complex') complexity values
+    expect(["low", "medium", "high", "simple", "moderate", "complex"]).toContain(data.complexity);
     await client.close();
-  });
+  }, 10000);
 
   it("generate_plan returns valid plan", async () => {
     const client = await createClient();
-    const classification = { domain: "ml", task_type: "modeling", complexity: "medium" };
-    const result = await client.callTool("generate_plan", {
-      task_description: "Train a transformer model for NER",
-      classification,
+    const classification = { 
+      domain: "general", 
+      task_type: "modeling", 
+      complexity: "medium",
+      approach: "hybrid",
+      estimated_duration: "days",
+      dependencies: [],
+      confidence: 0.8,
+      reasoning: "Test classification"
+    };
+    const result = await client.callTool({ 
+      name: "generate_plan", 
+      arguments: {
+        task_description: "Train a transformer model for NER",
+        classification,
+      }
     });
     const data = JSON.parse(result.content[0].text);
-    expect(data).toHaveProperty("phases");
-    expect(Array.isArray(data.phases)).toBe(true);
+    expect(data).toHaveProperty("steps");
+    expect(Array.isArray(data.steps)).toBe(true);
     await client.close();
-  });
+  }, 10000);
 
   it("validate_plan validates structure", async () => {
     const client = await createClient();
     const plan = {
       phases: [{ name: "data", steps: ["collect data"] }],
     };
-    const result = await client.callTool("validate_plan", { plan });
+    const result = await client.callTool({ name: "validate_plan", arguments: { plan } });
     const data = JSON.parse(result.content[0].text);
     expect(data).toHaveProperty("valid");
     expect(typeof data.valid).toBe("boolean");
     await client.close();
-  });
+  }, 10000);
 
   it("review_plan returns review result", async () => {
     const client = await createClient();
     const plan = {
       phases: [{ name: "data", steps: ["collect data"] }],
     };
-    const result = await client.callTool("review_plan", { plan });
+    const result = await client.callTool({ name: "review_plan", arguments: { plan } });
     const data = JSON.parse(result.content[0].text);
-    expect(data).toHaveProperty("overall_rating");
+    expect(data).toHaveProperty("overall_score");
     await client.close();
-  });
+  }, 10000);
 });

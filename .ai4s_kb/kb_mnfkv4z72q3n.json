@@ -1,0 +1,29 @@
+{
+  "kb_id": "kb_mnfkv4z72q3n",
+  "name": "test-domain",
+  "domain": "physics",
+  "description": "Test knowledge base",
+  "entries": [
+    {
+      "id": "entry_mnfkv4z7ye9r",
+      "title": "Navier-Stokes",
+      "content": "Updated content",
+      "tags": [
+        "fluid",
+        "PDE"
+      ],
+      "created_at": "2026-04-01T05:00:41.588Z"
+    },
+    {
+      "id": "entry_mnfkv4z81l8c",
+      "title": "Reynolds Number",
+      "content": "Dimensionless number for flow regime",
+      "tags": [
+        "fluid",
+        "dimensionless"
+      ],
+      "created_at": "2026-04-01T05:00:41.588Z"
+    }
+  ],
+  "created_at": "2026-04-01T05:00:41.587Z"
+}

@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import * as os from "node:os";
 
 export interface EnvironmentInfo {
   os: { platform: string; arch: string; release: string };
@@ -13,16 +14,16 @@ export interface EnvironmentInfo {
 export class EnvironmentDetectorService {
   detect(): EnvironmentInfo {
     const info: EnvironmentInfo = {
-      os: { platform: process.platform, arch: process.arch, release: require("node:os").release() },
+      os: { platform: process.platform, arch: process.arch, release: os.release() },
       cpu: { model: "", cores: 0 },
       memory: { totalGb: 0, freeGb: 0 },
       node: { version: process.version },
     };
 
     try {
-      info.cpu.cores = require("node:os").cpus().length;
-      info.memory.totalGb = Math.round(require("node:os").totalmem() / 1024 / 1024 / 1024);
-      info.memory.freeGb = Math.round(require("node:os").freemem() / 1024 / 1024 / 1024);
+      info.cpu.cores = os.cpus().length;
+      info.memory.totalGb = Math.round(os.totalmem() / 1024 / 1024 / 1024);
+      info.memory.freeGb = Math.round(os.freemem() / 1024 / 1024 / 1024);
     } catch {}
 
     // CPU model

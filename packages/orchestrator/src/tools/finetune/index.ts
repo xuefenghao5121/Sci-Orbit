@@ -56,3 +56,6 @@ export const finetuneTools: MCPToolDefinition<unknown, unknown>[] = [
     handler: (i) => finetuneEvaluate(i as FinetuneEvaluateInput),
   },
 ];
+
+// v0.5.0 精简导出：只保留数据准备（start/monitor/resume/merge/evaluate 由 Claude Code 通过 shell 执行）
+export const finetuneDataTools: MCPToolDefinition<unknown, unknown>[] = finetuneTools.filter(t => t.name === 'finetune_prepare');

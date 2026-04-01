@@ -3,5 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": ["packages/*"],
-  "description": "AI4S - AI for Scientific Computing Orchestrator"
+  "description": "AI4S - AI for Scientific Computing Orchestrator",
+  "scripts": {
+    "benchmark": "cd tests/benchmark && npm install && npm test"
+  }
 }

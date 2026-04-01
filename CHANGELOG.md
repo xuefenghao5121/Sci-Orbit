@@ -1,6 +1,41 @@
 # Changelog
 
-All notable changes to AI4S will be documented in this file.
+All notable changes to Sci-Orbit will be documented in this file.
+
+## [0.5.0] - 2026-04-01
+
+### ⚠️ Breaking Change — 工具精简 (38 → 17)
+
+从 38 个 MCP 工具精简到 **17 个核心工具**，淘汰 Claude Code 已具备的能力。
+
+**原则**：只保留 Claude Code 做不到的领域特定能力。
+
+#### Removed (21 tools — Claude Code 已具备)
+- `classify_task`, `generate_plan`, `validate_plan`, `review_plan` — Claude 天然擅长
+- `paper_parse`, `paper_compare`, `paper_implement` — Claude 能直接读论文
+- `exp_plan`, `exp_run`, `exp_monitor`, `exp_compare` — Claude 写脚本/读日志
+- `kb_create`, `kb_add`, `kb_search`, `kb_update` — Claude 管理文件
+- `finetune_start`, `finetune_monitor`, `finetune_resume`, `finetune_merge`, `finetune_evaluate`
+- `infer_start`, `infer_test`, `infer_stop` — Claude 跑 shell 命令
+- `check_code` — Claude 代码审查
+- `env_detect`, `env_setup` — 被 env_snapshot 替代
+- `science_jupyter` — Claude 操作 .ipynb
+- `debate_submit`, `debate_round`, `debate_resolve` — Phase 2 重构
+
+#### Added (12 new tools)
+- 🌍 `env_snapshot` / `env_diff` — 环境采集 + 对比
+- 🔧 `param_complete` / `param_validate` / `param_list_templates` / `param_generate_incar` / `param_generate_abacus_input`
+- 📊 `data_summarize` / `data_summarize_dir` / `data_supported_formats`
+- 📦 `finetune_prepare` / `kb_export`
+
+#### Retained (5 tools)
+- ⚖️ `check_dimension` / `check_conservation` / `check_range`
+- 🔬 `science_pyscf` / `science_rdkit` / `science_openmm`
+
+#### Infrastructure
+- 项目更名为 **Sci-Orbit**
+- GitHub: https://github.com/xuefenghao5121/Sci-Orbit
+- 新增 `docs/tool-audit.md`, `docs/tool-calling-research.md`, `docs/refactoring-plan.md`
 
 ## [0.4.0] - 2026-03-31
 

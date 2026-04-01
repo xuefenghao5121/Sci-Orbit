@@ -40,3 +40,6 @@ export const scienceTools: MCPToolDefinition<unknown, unknown>[] = [
     handler: (i) => scienceJupyter(i as ScienceJupyterInput),
   },
 ];
+
+// v0.5.0 精简导出：只保留计算工具（jupyter 由 Claude Code 操作）
+export const scienceComputeTools: MCPToolDefinition<unknown, unknown>[] = scienceTools.filter(t => t.name !== 'science_jupyter');

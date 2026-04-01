@@ -1,0 +1,15 @@
+{
+  "name": "sci-orbit-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "npx ts-node runner.ts",
+    "test:case": "npx ts-node runner.ts --case",
+    "test:category": "npx ts-node runner.ts --category"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -40,3 +40,6 @@ export const constrainTools: MCPToolDefinition<unknown, unknown>[] = [
     handler: (i) => checkCode(i as CheckCodeInput),
   },
 ];
+
+// v0.5.0 精简导出：只保留物理约束（check_code 由 Claude Code 做）
+export const constrainPhysicsTools: MCPToolDefinition<unknown, unknown>[] = constrainTools.filter(t => t.name !== 'check_code');

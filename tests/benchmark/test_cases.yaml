@@ -1,0 +1,274 @@
+# Sci-Orbit AI4S 工具调用能力评测用例
+# 每个用例有明确的 ground_truth，可自动化判定
+
+version: "1.0"
+created: "2026-04-01"
+
+test_cases:
+  # ============================================================
+  # 环境快照能力 (4 cases)
+  # ============================================================
+  
+  - id: TC001
+    name: "基础环境采集"
+    category: "env_snapshot"
+    difficulty: easy
+    description: "采集当前环境信息，验证关键字段存在性"
+    instruction: "请采集当前计算环境的完整快照"
+    ground_truth:
+      required_fields:
+        - hostname
+        - os
+        - kernel
+        - cpu
+        - ram_total_gb
+        - python.version
+        - python.path
+      must_not_be_empty:
+        - hostname
+        - os
+        - kernel
+        - python.version
+      type_checks:
+        ram_total_gb: "number > 0"
+        gpus: "array"
+    scoring:
+      - criterion: "所有 required_fields 都存在于返回结果中"
+        weight: 60
+      - criterion: "must_not_be_empty 字段不为空字符串或 'unknown'"
+        weight: 30
+      - criterion: "type_checks 类型正确"
+        weight: 10
+
+  - id: TC002
+    name: "GPU 检测（有 GPU 环境）"
+    category: "env_snapshot"
+    difficulty: medium
+    description: "检测 GPU 信息，验证字段完整性"
+    instruction: "采集环境快照，重点关注 GPU 信息"
+    ground_truth:
+      # 运行时动态判断：如果系统有 GPU
+      gpu_present_check:
+        - field: "gpus"
+          condition: "如果数组非空，每个 GPU 必须包含 id, model, memory_total_mb"
+          required_per_gpu: [id, model, memory_total_mb]
+      type_checks:
+        "gpus[].id": "number"
+        "gpus[].memory_total_mb": "number > 0"
+    scoring:
+      - criterion: "GPU 存在时返回完整信息"
+        weight: 50
+      - criterion: "GPU 不存在时返回空数组而非报错"
+        weight: 30
+      - criterion: "每个 GPU 字段类型正确"
+        weight: 20
+
+  - id: TC003
+    name: "科学包检测"
+    category: "env_snapshot"
+    difficulty: easy
+    description: "检测已安装的科学计算包"
+    instruction: "采集环境快照，列出所有检测到的科学包"
+    ground_truth:
+      # 运行时动态：检查 packages 字段是否为 object
+      packages_is_object: true
+      known_packages: ["numpy", "pandas", "scipy", "torch", "transformers", "ase", "rdkit", "pyscf", "openmm", "jax"]
+    scoring:
+      - criterion: "packages 是非空 object"
+        weight: 40
+      - criterion: "已安装的包版本号格式正确（如 1.24.3）"
+        weight: 40
+      - criterion: "未安装的包不出现在结果中"
+        weight: 20
+
+  - id: TC004
+    name: "环境差异对比"
+    category: "env_snapshot"
+    difficulty: medium
+    description: "对比两个环境快照，找出差异并评估风险"
+    instruction: |
+      保存当前环境快照到 /tmp/snapshot_a.json，
+      然后对比两个相同的快照，应该没有差异。
+    setup:
+      - command: "调用 env_snapshot 保存到 /tmp/snapshot_a.json"
+      - command: "调用 env_diff 对比 /tmp/snapshot_a.json 和 /tmp/snapshot_a.json"
+    ground_truth:
+      same_snapshot_diff:
+        has_diff: false
+        diffs: []
+        risk_level: "low"
+    scoring:
+      - criterion: "相同快照对比返回 has_diff=false"
+        weight: 50
+      - criterion: "diffs 为空数组"
+        weight: 30
+      - criterion: "risk_level 为 low"
+        weight: 20
+
+  # ============================================================
+  # 参数智能补全 (3 cases)
+  # ============================================================
+  
+  - id: TC005
+    name: "VASP 金属系统参数推断"
+    category: "param_complete"
+    difficulty: medium
+    description: "给定金属 Cu 的 VASP 计算，应推断出 ismear=1"
+    instruction: |
+      补全以下 VASP DFT 计算的参数：
+      - 工具: vasp_dft
+      - 系统: Cu（铜）
+      - 截断能: 500 eV
+    ground_truth:
+      explicit_params:
+        tool: "vasp_dft"
+        params: { system: "Cu", encut: 500 }
+      expected_implicit:
+        - key: "ismear"
+          expected_value: 1
+          reason: "Cu 是金属，应使用 ismear=1"
+        - key: "sigma"
+          expected_value: 0.2
+          reason: "金属应使用较大 sigma"
+        - key: "prec"
+          expected_value: "accurate"
+      expected_warnings:
+        - contains: "Cu"
+          contains: "metallic"
+          level: "warning"
+    scoring:
+      - criterion: "推断出 ismear=1（金属 smearing）"
+        weight: 40
+      - criterion: "推断出 sigma=0.2"
+        weight: 20
+      - criterion: "推断出 prec=accurate"
+        weight: 20
+      - criterion: "生成金属相关的警告"
+        weight: 20
+
+  - id: TC006
+    name: "LAMMPS 参数补全"
+    category: "param_complete"
+    difficulty: easy
+    description: "给定 NVT 水模拟，应补全默认参数"
+    instruction: |
+      补全以下 LAMMPS MD 计算的参数：
+      - 工具: lammps_md
+      - 结构文件: water.lmp
+      - 势函数文件: tip3p.xml
+      - 系综: nvt
+    ground_truth:
+      explicit_params:
+        tool: "lammps_md"
+        params: { structure_file: "water.lmp", potential_file: "tip3p.xml", ensemble: "nvt" }
+      expected_defaults:
+        temperature: 300
+        timestep: 1.0
+        total_steps: 100000
+        dump_interval: 1000
+    scoring:
+      - criterion: "补全 temperature=300"
+        weight: 30
+      - criterion: "补全 timestep=1.0"
+        weight: 30
+      - criterion: "补全 total_steps=100000"
+        weight: 20
+      - criterion: "补全 dump_interval=1000"
+        weight: 20
+
+  - id: TC007
+    name: "参数验证 - 约束检查"
+    category: "param_complete"
+    difficulty: medium
+    description: "故意传入矛盾参数，验证器应检测到"
+    instruction: |
+      验证以下 VASP 参数是否有问题：
+      - 工具: vasp_dft
+      - ismear: 0
+      - sigma: 0.5
+    ground_truth:
+      input_params:
+        tool: "vasp_dft"
+        params: { ismear: 0, sigma: 0.5 }
+      expected_warnings:
+        - must_contain: "sigma"
+          must_contain: "0.1"
+          level: "warning"
+          description: "ismear=0 时 sigma 应 < 0.1"
+    scoring:
+      - criterion: "检测到 ismear/sigma 矛盾"
+        weight: 60
+      - criterion: "警告中包含 sigma 和 0.1 的相关信息"
+        weight: 40
+
+  # ============================================================
+  # 科学数据摘要 (3 cases)
+  # ============================================================
+  
+  - id: TC008
+    name: "POSCAR 解析"
+    category: "data_summarize"
+    difficulty: easy
+    description: "解析硅的 POSCAR 文件，提取晶体信息"
+    instruction: "请摘要 /home/huawei/.openclaw/workspace/ai4s-cli/packages/orchestrator/test-fixtures/Si_POSCAR"
+    ground_truth:
+      file: "Si_POSCAR"
+      expected_fields:
+        format: "POSCAR"
+        key_fields:
+          system: "Si"
+          total_atoms: 2
+          coord_type: "Direct"
+      expected_summary_contains:
+        - "Si"
+        - "2"
+        - "atom"
+    scoring:
+      - criterion: "format 为 POSCAR"
+        weight: 20
+      - criterion: "识别出 2 个原子"
+        weight: 30
+      - criterion: "摘要包含 'Si'"
+        weight: 30
+      - criterion: "识别出坐标类型 Direct"
+        weight: 20
+
+  - id: TC009
+    name: "CIF 文件解析"
+    category: "data_summarize"
+    difficulty: easy
+    description: "解析硅的 CIF 文件，提取结构信息"
+    instruction: "请摘要 /home/huawei/.openclaw/workspace/ai4s-cli/packages/orchestrator/test-fixtures/Si.cif"
+    ground_truth:
+      file: "Si.cif"
+      expected_fields:
+        format: "CIF"
+        key_fields:
+          space_group: "Fd-3m"
+      expected_summary_contains:
+        - "Si"
+        - "Fd-3m"
+        - "5.43"
+    scoring:
+      - criterion: "format 为 CIF"
+        weight: 20
+      - criterion: "提取出空间群 Fd-3m"
+        weight: 40
+      - criterion: "提取出晶格常数 5.43"
+        weight: 40
+
+  - id: TC010
+    name: "未知格式处理"
+    category: "data_summarize"
+    difficulty: easy
+    description: "传入不支持的格式，应返回友好提示而非崩溃"
+    instruction: "请摘要 /home/huawei/.openclaw/workspace/ai4s-cli/package.json"
+    ground_truth:
+      format: "unknown"  # 或 "JSON"
+      must_not_crash: true
+      expected_behavior: "返回摘要或格式未识别提示，不抛异常"
+    scoring:
+      - criterion: "不崩溃，返回有效响应"
+        weight: 60
+      - criterion: "提示格式信息（识别为 JSON 或提示不支持）"
+        weight: 40

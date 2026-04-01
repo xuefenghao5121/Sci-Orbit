@@ -1,20 +1,29 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-/** Lazy-load tool modules on first access */
+/**
+ * Sci-Orbit v0.5.0 — 精简工具注册
+ * 
+ * 原则：只保留 Claude Code 不具备的能力
+ * 淘汰：plan-first(4), debate(3), paper(3), experiment(4), 
+ *        knowledge(4), finetune(4), deploy(3), check_code(1),
+ *        env_detect/setup(2), science_jupyter(1) = 29 个
+ * 保留：env_snapshot(2), param(4), data_summary(3), 
+ *        constrain物理(3), science计算(3), finetune准备(2) = 17 个
+ */
 const TOOL_LOADERS: Array<() => Promise<import("./tool-registry.js").ToolDefinition[]>> = [
-  () => import("./plan-first/index.js").then((m) => m.planFirstTools),
-  () => import("./debate/index.js").then((m) => m.debateTools),
-  () => import("./paper/index.js").then((m) => m.paperTools),
-  () => import("./experiment/index.js").then((m) => m.experimentTools),
-  () => import("./env/index.js").then((m) => m.envTools),
-  () => import("./knowledge/index.js").then((m) => m.knowledgeTools),
-  () => import("./finetune/index.js").then((m) => m.finetuneTools),
-  () => import("./science/index.js").then((m) => m.scienceTools),
-  () => import("./deploy/index.js").then((m) => m.deployTools),
-  () => import("./constrain/index.js").then((m) => m.constrainTools),
-  () => import("./data-summary/index.js").then((m) => m.dataSummaryTools),
+  // 🌍 环境智能 — Claude Code 无法一次采集全量环境信息
+  () => import("./env/index.js").then((m) => m.envSnapshotTools),
+  // 🔧 参数智能 — Claude Code 不知道 VASP/LAMMPS/ABACUS 的隐式参数
   () => import("./param-complete/index.js").then((m) => m.paramCompleteTools),
+  // 📊 数据智能 — Claude Code 无法理解 POSCAR/CIF/OUTCAR 等科学格式
+  () => import("./data-summary/index.js").then((m) => m.dataSummaryTools),
+  // ⚖️ 物理约束 — Claude Code 无法做量纲/守恒/范围检查
+  () => import("./constrain/index.js").then((m) => m.constrainPhysicsTools),
+  // 🔬 科学计算 — Claude Code 无法执行 PySCF/RDKit/OpenMM
+  () => import("./science/index.js").then((m) => m.scienceComputeTools),
+  // 📦 微调支持 — 数据准备和格式转换
+  () => import("./finetune/index.js").then((m) => m.finetuneDataTools),
 ];
 
 export interface ToolDefinition {

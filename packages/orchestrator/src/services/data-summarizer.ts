@@ -36,9 +36,15 @@ class PoscarParser implements FormatParser {
       const system = lines[0].trim();
       const scale = parseFloat(lines[1]);
       const a = parseFloat(lines[2].split(/\s+/)[0]) * scale;
-      const atomCounts = lines[5].trim().split(/\s+/).map(Number);
-      const totalAtoms = atomCounts.reduce((a, b) => a + b, 0);
-      const coordType = lines[7]?.trim() || 'unknown';
+      // POSCAR format: line 5 = atom types, line 6 = atom counts
+      // Some POSCAR files omit line 5 (atom types), so detect which line is numeric
+      let atomCountsLine = 6; // default: types on line 5, counts on line 6
+      if (/^\d+(\s+\d+)*$/.test(lines[5]?.trim())) {
+        atomCountsLine = 5; // no atom types line, counts directly
+      }
+      const atomCounts = lines[atomCountsLine].trim().split(/\s+/).map(Number);
+      const totalAtoms = atomCounts.reduce((s, n) => s + n, 0);
+      const coordType = lines[atomCountsLine + 1]?.trim() || 'unknown';
 
       // 尝试检测晶体类型
       let structure = 'unknown';

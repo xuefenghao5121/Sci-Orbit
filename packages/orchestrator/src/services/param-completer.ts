@@ -304,6 +304,9 @@ export class ParamCompleterService {
     if (rule.rule.includes('sigma应<0.1') && userParams.ismear === 0) {
       return { value: 0.05, confidence: 0.9, reason: 'ismear=0 requires small sigma' };
     }
+    if (rule.rule.includes('ismear=') && userParams.ismear === 1) {
+      return { value: 0.2, confidence: 0.9, reason: 'ismear=1 (metal) uses larger sigma' };
+    }
 
     // LAMMPS 特殊推断
     if (rule.rule.includes('水体系1fs')) {

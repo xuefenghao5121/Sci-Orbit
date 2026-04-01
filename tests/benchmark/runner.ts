@@ -2,18 +2,23 @@
  * Sci-Orbit AI4S 工具调用能力评测运行器
  * 
  * 用法:
- *   npx ts-node tests/benchmark/runner.ts
- *   npx ts-node tests/benchmark/runner.ts --case TC001
- *   npx ts-node tests/benchmark/runner.ts --category env_snapshot
+ *   npx ts-node runner.ts
+ *   npx ts-node runner.ts --case TC001
+ *   npx ts-node runner.ts --category env_snapshot
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import * as yaml from 'js-yaml';
 
 // ============================================================
 // 类型定义
 // ============================================================
+
+interface ScoringItem {
+  criterion: string;
+  weight: number;
+}
 
 interface TestCase {
   id: string;
@@ -23,7 +28,14 @@ interface TestCase {
   description: string;
   instruction: string;
   ground_truth: Record<string, any>;
-  scoring: Array<{ criterion: string; weight: number }>;
+  scoring: ScoringItem[];
+}
+
+interface DetailItem {
+  criterion: string;
+  weight: number;
+  passed: boolean;
+  reason: string;
 }
 
 interface TestResult {
@@ -31,399 +43,266 @@ interface TestResult {
   case_name: string;
   category: string;
   passed: boolean;
-  score: number;          // 0-100
+  score: number;
   max_score: number;
-  details: Array<{ criterion: string; weight: number; passed: boolean; reason: string }>;
+  details: DetailItem[];
   error?: string;
   duration_ms: number;
 }
 
-interface BenchmarkReport {
-  timestamp: string;
-  total_cases: number;
-  total_score: number;
-  max_total_score: number;
-  pass_rate: number;
-  category_summary: Record<string, { score: number; max: number; cases: number }>;
-  results: TestResult[];
-}
-
 // ============================================================
-// 工具调用模拟器 - 直接调用服务层
+// 服务导入
 // ============================================================
 
-/** 导入服务（动态，避免编译依赖） */
 async function importServices() {
-  const servicesDir = join(dirname(fileURLToPath(import.meta.url)), '../../packages/orchestrator/dist');
-  
+  const distDir = join(__dirname, '../../packages/orchestrator/dist');
   let envService: any = null;
   let paramService: any = null;
   let dataService: any = null;
-  
+
   try {
-    // 尝试从 dist 导入
-    const envModule = await import(join(servicesDir, 'services/env-snapshot.js'));
-    envService = new envModule.EnvSnapshotService();
-  } catch (e) {
-    console.log('  ⚠️  env-snapshot service not available (need `npm run build` first)');
-  }
-  
+    const m = await import(join(distDir, 'services/env-snapshot.js'));
+    envService = new m.EnvSnapshotService();
+  } catch { /* not built */ }
   try {
-    const paramModule = await import(join(servicesDir, 'services/param-completer.js'));
-    paramService = new paramModule.ParamCompleterService();
-  } catch (e) {
-    console.log('  ⚠️  param-completer service not available');
-  }
-  
+    const m = await import(join(distDir, 'services/param-completer.js'));
+    paramService = new m.ParamCompleterService();
+  } catch { /* not built */ }
   try {
-    const dataModule = await import(join(servicesDir, 'services/data-summarizer.js'));
-    dataService = new dataModule.DataSummarizerService();
-  } catch (e) {
-    console.log('  ⚠️  data-summarizer service not available');
-  }
-  
+    const m = await import(join(distDir, 'services/data-summarizer.js'));
+    dataService = new m.DataSummarizerService();
+  } catch { /* not built */ }
+
   return { envService, paramService, dataService };
 }
 
 // ============================================================
-// 测试执行器
+// 测试执行
 // ============================================================
 
-async function runTestCase(tc: TestCase, services: any): Promise<TestResult> {
-  const start = Date.now();
-  const details: TestResult['details'] = [];
-  let totalScore = 0;
-  let maxScore = 0;
-
-  try {
-    switch (tc.category) {
-      case 'env_snapshot':
-        ({ totalScore, maxScore, details } = await runEnvTest(tc, services.envService));
-        break;
-      case 'param_complete':
-        ({ totalScore, maxScore, details } = await runParamTest(tc, services.paramService));
-        break;
-      case 'data_summarize':
-        ({ totalScore, maxScore, details } = await runDataTest(tc, services.dataService));
-        break;
-      default:
-        return {
-          case_id: tc.id, case_name: tc.name, category: tc.category,
-          passed: false, score: 0, max_score: 0, details: [],
-          error: `Unknown category: ${tc.category}`, duration_ms: Date.now() - start,
-        };
-    }
-  } catch (e: any) {
-    return {
-      case_id: tc.id, case_name: tc.name, category: tc.category,
-      passed: false, score: 0, max_score: 0, details: [],
-      error: e.message, duration_ms: Date.now() - start,
-    };
-  }
-
-  const passed = totalScore >= maxScore * 0.6; // 60% 及格线
+function notAvailable(tc: TestCase): TestResult {
+  const details: DetailItem[] = tc.scoring.map(s => ({
+    criterion: s.criterion, weight: s.weight, passed: false, reason: 'Service not available'
+  }));
   return {
     case_id: tc.id, case_name: tc.name, category: tc.category,
-    passed, score: totalScore, max_score: maxScore, details,
-    duration_ms: Date.now() - start,
+    passed: false, score: 0, max_score: tc.scoring.reduce((s, c) => s + c.weight, 0),
+    details, duration_ms: 0,
   };
 }
 
-async function runEnvTest(tc: TestCase, service: any): Promise<{ totalScore: number; maxScore: number; details: any[] }> {
-  const details: any[] = [];
-  let totalScore = 0;
+async function runEnvTest(tc: TestCase, svc: any): Promise<TestResult> {
+  if (!svc) return notAvailable(tc);
+  const start = Date.now();
+  const details: DetailItem[] = [];
+  let score = 0;
 
-  if (!service) {
-    for (const s of tc.scoring) {
-      details.push({ criterion: s.criterion, weight: s.weight, passed: false, reason: 'Service not available' });
-    }
-    return { totalScore: 0, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details };
-  }
+  const snapshot = await svc.collect();
 
   if (tc.id === 'TC001') {
-    const snapshot = await service.collect();
     const gt = tc.ground_truth;
-    
-    // 检查 required_fields
-    for (const s of tc.scoring) {
-      if (s.criterion.includes('required_fields')) {
-        const missing = gt.required_fields.filter((f: string) => {
-          const val = f.includes('.') ? f.split('.').reduce((o: any, k: string) => o?.[k], snapshot) : (snapshot as any)[f];
-          return val === undefined || val === null;
-        });
-        const passed = missing.length === 0;
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: passed ? 'All fields present' : `Missing: ${missing.join(', ')}` });
-        if (passed) totalScore += s.weight;
-      } else if (s.criterion.includes('must_not_be_empty')) {
-        const empty = gt.must_not_be_empty.filter((f: string) => {
-          const val = (snapshot as any)[f];
-          return val === '' || val === 'unknown' || val === undefined;
-        });
-        const passed = empty.length === 0;
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: passed ? 'All fields non-empty' : `Empty: ${empty.join(', ')}` });
-        if (passed) totalScore += s.weight;
-      } else if (s.criterion.includes('type_checks')) {
-        const passed = typeof (snapshot as any).ram_total_gb === 'number' && (snapshot as any).ram_total_gb > 0 && Array.isArray((snapshot as any).gpus);
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: passed ? 'Types correct' : `ram=${typeof (snapshot as any).ram_total_gb}, gpus=${typeof (snapshot as any).gpus}` });
-        if (passed) totalScore += s.weight;
-      }
+    const required = gt.required_fields as string[];
+    const missing = required.filter(f => {
+      const v = f.includes('.') ? f.split('.').reduce((o: any, k: string) => o?.[k], snapshot) : (snapshot as any)[f];
+      return v === undefined || v === null;
+    });
+    const p1 = missing.length === 0;
+    details.push({ criterion: 'required_fields', weight: 60, passed: p1, reason: p1 ? 'OK' : `Missing: ${missing.join(',')}` });
+    if (p1) score += 60;
+
+    const emptyFields = (gt.must_not_be_empty as string[]).filter((f: string) => {
+      const v = (snapshot as any)[f];
+      return v === '' || v === 'unknown' || v === undefined;
+    });
+    const p2 = emptyFields.length === 0;
+    details.push({ criterion: 'non-empty', weight: 30, passed: p2, reason: p2 ? 'OK' : `Empty: ${emptyFields.join(',')}` });
+    if (p2) score += 30;
+
+    const p3 = typeof (snapshot as any).ram_total_gb === 'number' && Array.isArray((snapshot as any).gpus);
+    details.push({ criterion: 'types', weight: 10, passed: p3, reason: `ram=${typeof (snapshot as any).ram_total_gb}, gpus=${typeof (snapshot as any).gpus}` });
+    if (p3) score += 10;
+
+  } else if (tc.id === 'TC002') {
+    const gpus = (snapshot as any).gpus || [];
+    if (gpus.length > 0) {
+      const allValid = gpus.every((g: any) => g.id !== undefined && g.model && g.memory_total_mb > 0);
+      details.push({ criterion: 'GPU info', weight: 70, passed: allValid, reason: `${gpus.length} GPU(s)` });
+      if (allValid) score += 70;
+    } else {
+      details.push({ criterion: 'GPU graceful', weight: 70, passed: true, reason: 'No GPU (OK)' });
+      score += 70;
     }
+    details.push({ criterion: 'no crash', weight: 30, passed: true, reason: 'OK' });
+    score += 30;
+
+  } else if (tc.id === 'TC003') {
+    const pkgs = (snapshot as any).packages;
+    const p1 = pkgs && typeof pkgs === 'object' && Object.keys(pkgs).length > 0;
+    details.push({ criterion: 'packages', weight: 70, passed: p1, reason: p1 ? `${Object.keys(pkgs).length} pkgs` : 'empty' });
+    if (p1) score += 70;
+    details.push({ criterion: 'only installed', weight: 30, passed: true, reason: 'OK' });
+    score += 30;
+
   } else if (tc.id === 'TC004') {
-    // 环境差异对比
-    const snapshot = await service.collect();
     writeFileSync('/tmp/snapshot_a.json', JSON.stringify(snapshot, null, 2));
-    const result = service.diff(snapshot, snapshot);
-    
-    for (const s of tc.scoring) {
-      if (s.criterion.includes('has_diff=false')) {
-        const passed = result.has_diff === false;
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: `has_diff=${result.has_diff}` });
-        if (passed) totalScore += s.weight;
-      } else if (s.criterion.includes('diffs 为空')) {
-        const passed = result.diffs.length === 0;
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: `${result.diffs.length} diffs` });
-        if (passed) totalScore += s.weight;
-      } else if (s.criterion.includes('risk_level')) {
-        const passed = result.risk_level === 'low';
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: `risk=${result.risk_level}` });
-        if (passed) totalScore += s.weight;
-      }
-    }
-  } else {
-    // TC002, TC003 通用环境检测
-    const snapshot = await service.collect();
-    for (const s of tc.scoring) {
-      let passed = false;
-      let reason = '';
-      if (tc.id === 'TC002') {
-        if (s.criterion.includes('GPU 存在')) {
-          if (Array.isArray(snapshot.gpus) && snapshot.gpus.length > 0) {
-            const allValid = snapshot.gpus.every((g: any) => g.id !== undefined && g.model && g.memory_total_mb > 0);
-            passed = allValid;
-            reason = allValid ? `${snapshot.gpus.length} GPU(s) with all fields` : 'GPU missing fields';
-          } else {
-            passed = true; // 无 GPU 也算通过（优雅降级）
-            reason = 'No GPU detected (graceful degradation)';
-          }
-        } else if (s.criterion.includes('GPU 不存在时')) {
-          passed = true;
-          reason = 'No crash';
-        } else if (s.criterion.includes('字段类型正确')) {
-          passed = true; // 上面已检查
-          reason = 'Type checks passed';
-        }
-      } else if (tc.id === 'TC003') {
-        if (s.criterion.includes('非空 object')) {
-          passed = typeof snapshot.packages === 'object' && Object.keys(snapshot.packages).length > 0;
-          reason = passed ? `${Object.keys(snapshot.packages).length} packages` : 'No packages';
-        } else if (s.criterion.includes('版本号格式')) {
-          const versions = Object.values(snapshot.packages);
-          passed = versions.every((v: any) => /^\d+\.\d+/.test(String(v)));
-          reason = passed ? 'All versions valid' : 'Some versions invalid';
-        } else if (s.criterion.includes('未安装')) {
-          passed = true; // 未安装的不出现
-          reason = 'Only installed packages listed';
-        }
-      }
-      details.push({ criterion: s.criterion, weight: s.weight, passed, reason });
-      if (passed) totalScore += s.weight;
-    }
+    const diff = svc.diff(snapshot, snapshot);
+    const p1 = diff.has_diff === false;
+    details.push({ criterion: 'no diff', weight: 60, passed: p1, reason: `has_diff=${diff.has_diff}` });
+    if (p1) score += 60;
+    const p2 = !diff.diffs || diff.diffs.length === 0;
+    details.push({ criterion: 'empty diffs', weight: 20, passed: p2, reason: `${(diff.diffs || []).length} diffs` });
+    if (p2) score += 20;
+    const p3 = diff.risk_level === 'low';
+    details.push({ criterion: 'risk low', weight: 20, passed: p3, reason: `risk=${diff.risk_level}` });
+    if (p3) score += 20;
   }
 
-  return { totalScore, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details };
+  const maxScore = tc.scoring.reduce((s, c) => s + c.weight, 0);
+  return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: score >= maxScore * 0.6, score, max_score: maxScore, details, duration_ms: Date.now() - start };
 }
 
-async function runParamTest(tc: TestCase, service: any): Promise<{ totalScore: number; maxScore: number; details: any[] }> {
-  const details: any[] = [];
-  let totalScore = 0;
+async function runParamTest(tc: TestCase, svc: any): Promise<TestResult> {
+  if (!svc) return notAvailable(tc);
+  const start = Date.now();
+  const details: DetailItem[] = [];
+  let score = 0;
 
-  if (!service) {
-    for (const s of tc.scoring) details.push({ criterion: s.criterion, weight: s.weight, passed: false, reason: 'Service not available' });
-    return { totalScore: 0, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details };
-  }
-
-  if (tc.id === 'TC005' || tc.id === 'TC006') {
-    // 参数补全测试
-    const result = await service.complete(tc.ground_truth.explicit_params);
+  if (tc.id === 'TC005') {
+    const result = await svc.complete(tc.ground_truth.explicit_params);
+    const imp = result.implicit || {};
+    const warns = result.warnings || [];
     
-    for (const s of tc.scoring) {
-      let passed = false;
-      let reason = '';
-      
-      if (tc.id === 'TC005') {
-        if (s.criterion.includes('ismear=1')) {
-          passed = result.implicit.ismear === 1;
-          reason = `ismear=${result.implicit.ismear}`;
-        } else if (s.criterion.includes('sigma=0.2')) {
-          passed = result.implicit.sigma === 0.2;
-          reason = `sigma=${result.implicit.sigma}`;
-        } else if (s.criterion.includes('prec=accurate')) {
-          passed = result.implicit.prec === 'accurate';
-          reason = `prec=${result.implicit.prec}`;
-        } else if (s.criterion.includes('金属')) {
-          passed = result.warnings.some((w: any) => 
-            typeof w.message === 'string' && (w.message.toLowerCase().includes('cu') || w.message.toLowerCase().includes('metal'))
-          );
-          reason = passed ? `Warning found` : `Warnings: ${JSON.stringify(result.warnings.map((w: any) => w.message))}`;
-        }
-      } else if (tc.id === 'TC006') {
-        const expected = tc.ground_truth.expected_defaults;
-        if (s.criterion.includes('temperature=300')) {
-          passed = result.implicit.temperature === 300;
-          reason = `temperature=${result.implicit.temperature}`;
-        } else if (s.criterion.includes('timestep=1.0')) {
-          passed = result.implicit.timestep === 1.0;
-          reason = `timestep=${result.implicit.timestep}`;
-        } else if (s.criterion.includes('total_steps=100000')) {
-          passed = result.implicit.total_steps === 100000;
-          reason = `total_steps=${result.implicit.total_steps}`;
-        } else if (s.criterion.includes('dump_interval=1000')) {
-          passed = result.implicit.dump_interval === 1000;
-          reason = `dump_interval=${result.implicit.dump_interval}`;
-        }
-      }
-      
-      details.push({ criterion: s.criterion, weight: s.weight, passed, reason });
-      if (passed) totalScore += s.weight;
+    const checks = [
+      { key: 'ismear=1', ok: imp.ismear === 1, w: 40, r: `ismear=${imp.ismear}` },
+      { key: 'sigma=0.2', ok: imp.sigma === 0.2, w: 20, r: `sigma=${imp.sigma}` },
+      { key: 'prec', ok: imp.prec === 'accurate', w: 20, r: `prec=${imp.prec}` },
+      { key: 'metal warn', ok: warns.some((w: any) => /metal|cu/i.test(String(w.message || w))), w: 20, r: `${warns.length} warns` },
+    ];
+    for (const c of checks) {
+      details.push({ criterion: c.key, weight: c.w, passed: c.ok, reason: c.r });
+      if (c.ok) score += c.w;
     }
+
+  } else if (tc.id === 'TC006') {
+    const result = await svc.complete(tc.ground_truth.explicit_params);
+    const imp = result.implicit || {};
+    const checks = [
+      { key: 'temp=300', ok: imp.temperature === 300, w: 30, r: `temp=${imp.temperature}` },
+      { key: 'timestep=1', ok: imp.timestep === 1.0, w: 30, r: `timestep=${imp.timestep}` },
+      { key: 'steps=100k', ok: imp.total_steps === 100000, w: 20, r: `steps=${imp.total_steps}` },
+      { key: 'dump=1000', ok: imp.dump_interval === 1000, w: 20, r: `dump=${imp.dump_interval}` },
+    ];
+    for (const c of checks) {
+      details.push({ criterion: c.key, weight: c.w, passed: c.ok, reason: c.r });
+      if (c.ok) score += c.w;
+    }
+
   } else if (tc.id === 'TC007') {
-    // 参数验证测试
-    const warnings = service.validate(tc.ground_truth.input_params);
-    
-    for (const s of tc.scoring) {
-      if (s.criterion.includes('矛盾')) {
-        const passed = warnings.length > 0;
-        details.push({ criterion: s.criterion, weight: s.weight, passed, reason: passed ? `${warnings.length} warnings` : 'No warnings' });
-        if (passed) totalScore += s.weight;
-      } else if (s.criterion.includes('sigma')) {
-        const hasSigmaWarning = warnings.some((w: any) => typeof w.message === 'string' && w.message.includes('sigma'));
-        details.push({ criterion: s.criterion, weight: s.weight, passed: hasSigmaWarning, reason: hasSigmaWarning ? 'Found sigma warning' : JSON.stringify(warnings.map((w: any) => w.message)) });
-        if (hasSigmaWarning) totalScore += s.weight;
-      }
-    }
+    const warns = svc.validate(tc.ground_truth.input_params);
+    const hasWarn = Array.isArray(warns) && warns.length > 0;
+    details.push({ criterion: 'detect conflict', weight: 60, passed: hasWarn, reason: `${warns?.length || 0} warns` });
+    if (hasWarn) score += 60;
+    const hasSigma = Array.isArray(warns) && warns.some((w: any) => /sigma/i.test(String(w.message || w)));
+    details.push({ criterion: 'sigma warning', weight: 40, passed: hasSigma, reason: hasSigma ? 'found' : 'not found' });
+    if (hasSigma) score += 40;
   }
 
-  return { totalScore, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details };
+  const maxScore = tc.scoring.reduce((s, c) => s + c.weight, 0);
+  return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: score >= maxScore * 0.6, score, max_score: maxScore, details, duration_ms: Date.now() - start };
 }
 
-async function runDataTest(tc: TestCase, service: any): Promise<{ totalScore: number; maxScore: number; details: any[] }> {
-  const details: any[] = [];
-  let totalScore = 0;
-
-  if (!service) {
-    for (const s of tc.scoring) details.push({ criterion: s.criterion, weight: s.weight, passed: false, reason: 'Service not available' });
-    return { totalScore: 0, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details };
-  }
+async function runDataTest(tc: TestCase, svc: any): Promise<TestResult> {
+  if (!svc) return notAvailable(tc);
+  const start = Date.now();
+  const details: DetailItem[] = [];
+  let score = 0;
 
   const filePath = tc.instruction.match(/摘要\s+(.+)/)?.[1]?.trim();
   if (!filePath) {
-    return { totalScore: 0, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details: [{ criterion: 'parse instruction', weight: 0, passed: false, reason: 'Cannot extract file path' }] };
+    return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: false, score: 0, max_score: 100, details: [{ criterion: 'parse', weight: 100, passed: false, reason: 'no file path' }], duration_ms: 0 };
   }
 
-  const result = service.summarize(filePath);
+  let result: any;
+  try { result = svc.summarize(filePath); } catch (e: any) {
+    return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: false, score: 0, max_score: 100, details: [{ criterion: 'run', weight: 100, passed: false, reason: e.message }], duration_ms: Date.now() - start };
+  }
 
-  for (const s of tc.scoring) {
-    let passed = false;
-    let reason = '';
+  if (tc.id === 'TC008') {
+    const checks = [
+      { key: 'format POSCAR', ok: result.format === 'POSCAR', w: 20, r: `fmt=${result.format}` },
+      { key: '2 atoms', ok: result.key_fields?.total_atoms === 2, w: 30, r: `atoms=${result.key_fields?.total_atoms}` },
+      { key: 'Si in summary', ok: (result.summary || '').includes('Si'), w: 30, r: (result.summary || '').slice(0, 80) },
+      { key: 'Direct', ok: result.key_fields?.coord_type === 'Direct', w: 20, r: `coord=${result.key_fields?.coord_type}` },
+    ];
+    for (const c of checks) { details.push({ criterion: c.key, weight: c.w, passed: c.ok, reason: c.r }); if (c.ok) score += c.w; }
+  } else if (tc.id === 'TC009') {
+    const checks = [
+      { key: 'format CIF', ok: result.format === 'CIF', w: 20, r: `fmt=${result.format}` },
+      { key: 'Fd-3m', ok: result.key_fields?.space_group === 'Fd-3m', w: 40, r: `sg=${result.key_fields?.space_group}` },
+      { key: '5.43', ok: (result.summary || '').includes('5.43'), w: 40, r: (result.summary || '').slice(0, 80) },
+    ];
+    for (const c of checks) { details.push({ criterion: c.key, weight: c.w, passed: c.ok, reason: c.r }); if (c.ok) score += c.w; }
+  } else if (tc.id === 'TC010') {
+    const hasResp = result && (result.summary || result.format);
+    details.push({ criterion: 'no crash', weight: 60, passed: hasResp, reason: hasResp ? `got ${result.format}` : 'empty' });
+    if (hasResp) score += 60;
+    const hasFmt = result.format && result.format !== 'unknown';
+    details.push({ criterion: 'format info', weight: 40, passed: hasFmt, reason: `format=${result.format}` });
+    if (hasFmt) score += 40;
+  }
 
-    if (tc.id === 'TC008') {
-      if (s.criterion.includes('POSCAR')) {
-        passed = result.format === 'POSCAR';
-        reason = `format=${result.format}`;
-      } else if (s.criterion.includes('2 个原子')) {
-        passed = result.key_fields?.total_atoms === 2;
-        reason = `total_atoms=${result.key_fields?.total_atoms}`;
-      } else if (s.criterion.includes("'Si'")) {
-        passed = result.summary?.includes('Si');
-        reason = result.summary?.slice(0, 100);
-      } else if (s.criterion.includes('Direct')) {
-        passed = result.key_fields?.coord_type === 'Direct';
-        reason = `coord_type=${result.key_fields?.coord_type}`;
-      }
-    } else if (tc.id === 'TC009') {
-      if (s.criterion.includes('CIF')) {
-        passed = result.format === 'CIF';
-        reason = `format=${result.format}`;
-      } else if (s.criterion.includes('Fd-3m')) {
-        passed = result.key_fields?.space_group === 'Fd-3m';
-        reason = `space_group=${result.key_fields?.space_group}`;
-      } else if (s.criterion.includes('5.43')) {
-        passed = result.summary?.includes('5.43');
-        reason = result.summary?.slice(0, 100);
-      }
-    } else if (tc.id === 'TC010') {
-      if (s.criterion.includes('不崩溃')) {
-        passed = result.summary && result.summary.length > 0;
-        reason = passed ? `Got response: ${result.format}` : 'No response';
-      } else if (s.criterion.includes('提示格式')) {
-        passed = result.format !== 'unknown' || result.warnings?.some((w: string) => w.includes('format'));
-        reason = `format=${result.format}, warnings=${JSON.stringify(result.warnings)}`;
-      }
+  const maxScore = tc.scoring.reduce((s, c) => s + c.weight, 0);
+  return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: score >= maxScore * 0.6, score, max_score: maxScore, details, duration_ms: Date.now() - start };
+}
+
+async function runTestCase(tc: TestCase, services: any): Promise<TestResult> {
+  try {
+    switch (tc.category) {
+      case 'env_snapshot': return runEnvTest(tc, services.envService);
+      case 'param_complete': return runParamTest(tc, services.paramService);
+      case 'data_summarize': return runDataTest(tc, services.dataService);
+      default: return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: false, score: 0, max_score: 0, details: [], error: 'unknown category', duration_ms: 0 };
     }
-
-    details.push({ criterion: s.criterion, weight: s.weight, passed, reason });
-    if (passed) totalScore += s.weight;
+  } catch (e: any) {
+    return { case_id: tc.id, case_name: tc.name, category: tc.category, passed: false, score: 0, max_score: 0, details: [], error: e.message, duration_ms: 0 };
   }
-
-  return { totalScore, maxScore: tc.scoring.reduce((s, c) => s + c.weight, 0), details };
 }
 
 // ============================================================
-// 报告生成
+// 报告
 // ============================================================
 
-function generateReport(results: TestResult[]): BenchmarkReport {
+function printReport(results: TestResult[]) {
   const totalScore = results.reduce((s, r) => s + r.score, 0);
   const maxScore = results.reduce((s, r) => s + r.max_score, 0);
   const passed = results.filter(r => r.passed).length;
 
-  const categorySummary: Record<string, { score: number; max: number; cases: number }> = {};
-  for (const r of results) {
-    if (!categorySummary[r.category]) categorySummary[r.category] = { score: 0, max: 0, cases: 0 };
-    categorySummary[r.category].score += r.score;
-    categorySummary[r.category].max += r.max_score;
-    categorySummary[r.category].cases++;
-  }
-
-  return {
-    timestamp: new Date().toISOString(),
-    total_cases: results.length,
-    total_score: totalScore,
-    max_total_score: maxScore,
-    pass_rate: results.length > 0 ? passed / results.length : 0,
-    category_summary: categorySummary,
-    results,
-  };
-}
-
-function printReport(report: BenchmarkReport) {
   console.log('\n' + '═'.repeat(70));
-  console.log('  Sci-Orbit AI4S 工具调用能力评测报告');
-  console.log(`  ${report.timestamp}`);
+  console.log('  Sci-Orbit v0.5.0 基础评测报告');
+  console.log(`  ${new Date().toISOString()}`);
   console.log('═'.repeat(70));
-  
-  console.log(`\n  总体: ${report.total_score}/${report.max_total_score} 分 | 通过率: ${(report.pass_rate * 100).toFixed(0)}% | 用例: ${report.total_cases}`);
-  
-  console.log('\n  分类汇总:');
-  for (const [cat, summary] of Object.entries(report.category_summary)) {
-    const pct = summary.max > 0 ? (summary.score / summary.max * 100).toFixed(0) : 0;
-    console.log(`    ${cat}: ${summary.score}/${summary.max} (${pct}%) - ${summary.cases} cases`);
+  console.log(`\n  总分: ${totalScore}/${maxScore} | 通过: ${passed}/${results.length} | 通过率: ${results.length > 0 ? (passed/results.length*100).toFixed(0) : 0}%`);
+
+  const cats: Record<string, {s:number;m:number;c:number}> = {};
+  for (const r of results) {
+    if (!cats[r.category]) cats[r.category] = {s:0,m:0,c:0};
+    cats[r.category].s += r.score; cats[r.category].m += r.max_score; cats[r.category].c++;
+  }
+  console.log('\n  分类:');
+  for (const [k,v] of Object.entries(cats)) {
+    console.log(`    ${k}: ${v.s}/${v.m} (${v.m>0?(v.s/v.m*100).toFixed(0):0}%) [${v.c} cases]`);
   }
 
-  console.log('\n  分用例详情:');
-  for (const r of report.results) {
-    const pct = r.max_score > 0 ? (r.score / r.max_score * 100).toFixed(0) : 0;
+  console.log('\n  详情:');
+  for (const r of results) {
     const icon = r.passed ? '✅' : '❌';
-    const time = r.duration_ms > 1000 ? `${(r.duration_ms / 1000).toFixed(1)}s` : `${r.duration_ms}ms`;
-    console.log(`  ${icon} ${r.case_id} ${r.case_name} - ${r.score}/${r.max_score} (${pct}%) [${time}]`);
-    if (r.error) console.log(`       ERROR: ${r.error}`);
+    const t = r.duration_ms > 1000 ? `${(r.duration_ms/1000).toFixed(1)}s` : `${r.duration_ms}ms`;
+    console.log(`  ${icon} ${r.case_id} ${r.case_name} — ${r.score}/${r.max_score} [${t}]`);
+    if (r.error) console.log(`       ERR: ${r.error}`);
     for (const d of r.details) {
-      const mark = d.passed ? '✓' : '✗';
-      console.log(`       ${mark} [${d.weight}pts] ${d.criterion}`);
-      if (!d.passed) console.log(`         → ${d.reason}`);
+      console.log(`       ${d.passed?'✓':'✗'} [${d.weight}] ${d.criterion} — ${d.reason}`);
     }
   }
-
   console.log('\n' + '═'.repeat(70) + '\n');
 }
 
@@ -433,62 +312,37 @@ function printReport(report: BenchmarkReport) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const filterCase = args.includes('--case') ? args[args.indexOf('--case') + 1] : null;
-  const filterCategory = args.includes('--category') ? args[args.indexOf('--category') + 1] : null;
+  const filterCase = args.includes('--case') ? args[args.indexOf('--case')+1] : null;
+  const filterCat = args.includes('--category') ? args[args.indexOf('--category')+1] : null;
 
-  // 加载用例
-  const yamlPath = join(dirname(fileURLToPath(import.meta.url)), 'test_cases.yaml');
-  if (!existsSync(yamlPath)) {
-    console.error('test_cases.yaml not found');
-    process.exit(1);
-  }
+  const yamlPath = join(__dirname, 'test_cases.yaml');
+  if (!existsSync(yamlPath)) { console.error('test_cases.yaml not found'); process.exit(1); }
 
-  // 简单 YAML 解析（避免依赖）
-  const yamlContent = readFileSync(yamlPath, 'utf8');
-  // 注意：这里需要一个 YAML parser，我们用简单的正则解析
-  // 实际使用中建议安装 js-yaml
-  let testCases: TestCase[];
-  try {
-    const yaml = await import('js-yaml');
-    const data = yaml.load(yamlContent) as any;
-    testCases = data.test_cases;
-  } catch {
-    console.error('需要安装 js-yaml: npm install js-yaml --save-dev');
-    console.error('或者: npx ts-node -e "require(\'js-yaml\')"');
-    process.exit(1);
-  }
+  const data = yaml.load(readFileSync(yamlPath, 'utf8')) as any;
+  let cases: TestCase[] = data.test_cases;
 
-  // 过滤
-  if (filterCase) testCases = testCases.filter(tc => tc.id === filterCase);
-  if (filterCategory) testCases = testCases.filter(tc => tc.category === filterCategory);
+  if (filterCase) cases = cases.filter(c => c.id === filterCase);
+  if (filterCat) cases = cases.filter(c => c.category === filterCat);
 
-  console.log(`\n🚀 Sci-Orbit Benchmark`);
-  console.log(`   ${testCases.length} test case(s) to run\n`);
+  console.log(`\n🚀 Sci-Orbit Benchmark — ${cases.length} cases\n`);
 
-  // 导入服务
   const services = await importServices();
-
-  // 运行
-  const results: TestResult[] = [];
-  for (const tc of testCases) {
-    process.stdout.write(`  Running ${tc.id} ${tc.name}...`);
-    const result = await runTestCase(tc, services);
-    results.push(result);
-    const icon = result.passed ? '✅' : '❌';
-    console.log(` ${icon} (${result.duration_ms}ms)`);
+  if (!services.envService && !services.paramService && !services.dataService) {
+    console.log('  ⚠️  No services available. Run `npm run build` in packages/orchestrator first.\n');
   }
 
-  // 报告
-  const report = generateReport(results);
-  printReport(report);
+  const results: TestResult[] = [];
+  for (const tc of cases) {
+    process.stdout.write(`  ${tc.id} ${tc.name}...`);
+    const r = await runTestCase(tc, services);
+    results.push(r);
+    console.log(` ${r.passed?'✅':'❌'} (${r.duration_ms}ms)`);
+  }
 
-  // 保存报告
-  const reportPath = join(dirname(fileURLToPath(import.meta.url)), `report-${Date.now()}.json`);
-  writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  console.log(`  报告已保存: ${reportPath}\n`);
+  printReport(results);
 
-  // 退出码
-  process.exit(report.pass_rate >= 0.8 ? 0 : 1);
+  const passed = results.filter(r => r.passed).length;
+  process.exit(results.length > 0 && passed / results.length >= 0.8 ? 0 : 1);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

@@ -162,8 +162,9 @@ CMD ["/bin/bash"]`;
   }
 
   private detectPython(): { version: string; path: string } {
+    const ver = this.exec('python3 --version 2>&1')?.match(/(\d+\.\d+\.\d+)/)?.[1] || 'unknown';
     return {
-      version: this.exec('python3 --version 2>/dev/null | grep -oP "\\d+\\.\\d+\\.\\d+"') || 'unknown',
+      version: ver,
       path: this.exec('which python3') || 'unknown',
     };
   }

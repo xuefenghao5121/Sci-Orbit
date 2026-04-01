@@ -133,8 +133,7 @@ test_cases:
         - key: "prec"
           expected_value: "accurate"
       expected_warnings:
-        - contains: "Cu"
-          contains: "metallic"
+        - contains_any: ["Cu", "metallic"]
           level: "warning"
     scoring:
       - criterion: "推断出 ismear=1（金属 smearing）"
@@ -191,8 +190,7 @@ test_cases:
         tool: "vasp_dft"
         params: { ismear: 0, sigma: 0.5 }
       expected_warnings:
-        - must_contain: "sigma"
-          must_contain: "0.1"
+        - contains_any: ["sigma", "0.1"]
           level: "warning"
           description: "ismear=0 时 sigma 应 < 0.1"
     scoring:

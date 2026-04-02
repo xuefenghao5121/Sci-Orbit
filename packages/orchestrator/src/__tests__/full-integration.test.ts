@@ -131,7 +131,7 @@ describe('Integration: all tool modules are importable', () => {
     expect(debateTools.length).toBe(3);
     expect(paperTools.length).toBe(3);
     expect(experimentTools.length).toBe(4);
-    expect(envTools.length).toBe(2);
+    expect(envTools.length).toBe(4);
     expect(knowledgeTools.length).toBe(5);
     expect(finetuneTools.length).toBe(6);
     expect(scienceTools.length).toBe(4);
@@ -141,6 +141,6 @@ describe('Integration: all tool modules are importable', () => {
     const total = planFirstTools.length + debateTools.length + paperTools.length +
       experimentTools.length + envTools.length + knowledgeTools.length +
       finetuneTools.length + scienceTools.length + deployTools.length + constrainTools.length;
-    expect(total).toBe(38);
+    expect(total).toBe(40);
   });
 });

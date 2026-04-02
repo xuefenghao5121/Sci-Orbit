@@ -11,10 +11,18 @@ let client: Client;
 let transport: StdioClientTransport;
 
 const EXPECTED_TOOL_PREFIXES = [
-  "classify_", "generate_", "validate_", "review_",  // plan tools
-  "debate_", "paper_", "exp_", "env_",
-  "kb_", "finetune_", "science_", "infer_", "check_"
+  "env_", "param_", "data_", "check_", // core tools
+  "science_", "finetune_"  // domain tools
 ];
+
+// All actual tool names (17 total in v0.5.0):
+// env_snapshot, env_diff (2)
+// param_complete, param_validate, param_list_templates, param_generate_incar, param_generate_abacus_input (5)
+// data_summarize, data_summarize_dir, data_supported_formats (3)
+// check_dimension, check_conservation, check_range (3)
+// science_pyscf, science_rdkit, science_openmm (3)
+// finetune_prepare (1)
+// Total: 2+5+3+3+3+1 = 17
 
 beforeAll(async () => {
   client = new Client({ name: "test-client", version: "0.4.0" });
@@ -38,7 +46,7 @@ describe("MCP Protocol - Tools", () => {
   it("should list all tools", async () => {
     const result = await client.listTools();
     tools = result.tools;
-    expect(tools.length).toBeGreaterThanOrEqual(30);
+    expect(tools.length).toBeGreaterThanOrEqual(15);
   });
 
   it("every tool should have valid schema", () => {

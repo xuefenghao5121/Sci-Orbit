@@ -300,13 +300,19 @@ class DimensionParser {
         }
 
         // Get dimension for variable
-        const dimStr = variables[varName] || this.dimensions[varName];
+        let dimStr = variables[varName] || this.dimensions[varName];
         if (!dimStr) {
           // Unknown dimension, use variable name as dimension symbol
           const mult = currentOp === '*' ? exponent : -exponent;
           const existing = result.get(varName) || 0;
           result.set(varName, existing + mult);
           continue;
+        }
+        // Strip square brackets if user input uses [energy] format
+        dimStr = dimStr.trim().replace(/^\[(.*)\]$/, '$1').trim();
+        // Lookup the clean name in dimensions map if it exists
+        if (this.dimensions[dimStr]) {
+          dimStr = this.dimensions[dimStr];
         }
 
         // Parse the dimension string and merge

@@ -1,0 +1,12 @@
+{
+  "id": "sci-orbit",
+  "name": "Sci-Orbit AI4S",
+  "description": "Scientific computing intelligence plugin - env detection, param completion, data summarization",
+  "version": "0.1.0",
+  "skills": [],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

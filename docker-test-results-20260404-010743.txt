@@ -1,0 +1,101 @@
+
+> @ai4s/monorepo@0.1.0 test
+> npm run test --workspaces --if-present
+
+
+> @ai4s/orchestrator@0.5.0 test
+> vitest run
+
+
+ RUN  v3.2.4 /app/ai4s-cli/packages/orchestrator
+
+ ❯ src/__tests__/integration.test.ts (9 tests | 9 skipped) 9ms
+   ↓ MCP Protocol - Tools > should list all tools
+   ↓ MCP Protocol - Tools > every tool should have valid schema
+   ↓ MCP Protocol - Tools > tools should cover all expected categories
+   ↓ MCP Protocol - Tools > tool schemas should have required properties
+   ↓ MCP Protocol - Resources > should list all resources
+   ↓ MCP Protocol - Resources > should read each resource successfully
+   ↓ MCP Protocol - Tool Execution > env_detect should return environment info
+   ↓ MCP Protocol - Tool Execution > env_detect should return detection results
+   ↓ MCP Protocol - Error Handling > invalid tool name should return error
+[AI4S] ai4s-orchestrator v0.4.0 initializing...
+[AI4S] Node.js: v22.22.2 | PID: 6751
+[AI4S] Starting ai4s-orchestrator v0.4.0...
+[AI4S] 🚀 Cold boot completed in 88ms
+[AI4S] ai4s-orchestrator MCP Server started on stdio
+[AI4S] ai4s-orchestrator v0.4.0 initializing...
+[AI4S] Node.js: v22.22.2 | PID: 6798
+[AI4S] Starting ai4s-orchestrator v0.4.0...
+[AI4S] 🚀 Cold boot completed in 89ms
+[AI4S] ai4s-orchestrator MCP Server started on stdio
+/bin/sh: 1: nvidia-smi: not found
+ ✓ src/tools/__tests__/env.test.ts (3 tests) 670ms
+   ✓ env_detect > should return environment info with os field  669ms
+ ✓ src/__tests__/full-integration.test.ts (7 tests) 821ms
+   ✓ Integration: env_detect → validate output > returns valid environment info  570ms
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
+ ✓ src/services/__tests__/llm-client.test.ts (2 tests) 287ms
+ ✓ src/services/hpc/__tests__/manager.test.ts (4 tests) 587ms
+ ✓ src/tools/__tests__/experiment.test.ts (4 tests) 5ms
+ ✓ src/services/feedback/__tests__/collector.test.ts (7 tests) 9ms
+ ✓ src/services/inference/__tests__/server-manager.test.ts (3 tests) 9ms
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'jax'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'transformers'
+ ✓ src/tools/finetune/__tests__/finetune.test.ts (5 tests) 3ms
+ ✓ src/tools/__tests__/knowledge.test.ts (2 tests) 8ms
+[AI4S] ai4s-orchestrator v0.4.0 initializing...
+[AI4S] Node.js: v22.22.2 | PID: 7205
+[AI4S] Starting ai4s-orchestrator v0.4.0...
+[AI4S] 🚀 Cold boot completed in 89ms
+[AI4S] ai4s-orchestrator MCP Server started on stdio
+[AI4S] ai4s-orchestrator v0.4.0 initializing...
+[AI4S] Node.js: v22.22.2 | PID: 7252
+ ✓ src/services/__tests__/storage.test.ts (4 tests) 10ms
+ ✓ src/services/constraints/__tests__/engine.test.ts (12 tests) 5ms
+[AI4S] Starting ai4s-orchestrator v0.4.0...
+[AI4S] 🚀 Cold boot completed in 98ms
+[AI4S] ai4s-orchestrator MCP Server started on stdio
+[AI4S] ai4s-orchestrator v0.4.0 initializing...
+[AI4S] Node.js: v22.22.2 | PID: 7301
+ ✓ src/tools/__tests__/paper.test.ts (3 tests) 4ms
+ ✓ src/tools/__tests__/plan-first.test.ts (6 tests) 5ms
+[AI4S] Starting ai4s-orchestrator v0.4.0...
+[AI4S] 🚀 Cold boot completed in 95ms
+[AI4S] ai4s-orchestrator MCP Server started on stdio
+ ✓ src/__tests__/e2e.test.ts (5 tests) 2771ms
+   ✓ MCP Server E2E > env_snapshot returns valid environment info  2179ms
+ ✓ src/tools/__tests__/debate.test.ts (5 tests) 5ms
+ ✓ src/tools/__tests__/phase2.test.ts (1 test) 4ms
+ ✓ src/services/finetune/__tests__/training-manager.test.ts (6 tests) 4ms
+ ✓ src/tools/constrain/__tests__/constrain.test.ts (5 tests) 3ms
+ ✓ src/services/__tests__/config.test.ts (2 tests) 3ms
+ ✓ src/tools/science/__tests__/science.test.ts (4 tests) 3ms
+ ✓ src/security/__tests__/security.test.ts (2 tests) 2ms
+ ✓ src/tools/deploy/__tests__/deploy.test.ts (3 tests) 2ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/integration.test.ts [ src/__tests__/integration.test.ts ]
+Error: spawn node ENOENT
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 22 passed (23)
+      Tests  95 passed | 9 skipped (104)
+   Start at  22:07:34
+   Duration  3.39s (transform 472ms, setup 0ms, collect 1.23s, tests 5.23s, environment 3ms, prepare 1.11s)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /app/ai4s-cli/packages/orchestrator
+npm error workspace @ai4s/orchestrator@0.5.0
+npm error location /app/ai4s-cli/packages/orchestrator
+npm error command failed
+npm error command sh -c vitest run

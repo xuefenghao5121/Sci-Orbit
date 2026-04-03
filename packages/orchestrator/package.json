@@ -1,6 +1,6 @@
 {
   "name": "@ai4s/orchestrator",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "AI4S MCP Server - Claude Code orchestrator for scientific computing",
   "type": "module",
   "main": "dist/index.js",

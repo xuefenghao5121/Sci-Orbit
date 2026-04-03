@@ -3,8 +3,8 @@
 > 🔬 Scientific Computing Enhancement Toolkit for AI Coding Agents — bridging Claude Code, OpenClaw, and beyond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-orange.svg)]()
-[![Tests](https://img.shields.io/badge/tests-104%2F104-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.6.0-orange.svg)]()
+[![Tests](https://img.shields.io/badge/tests-87%2F87-brightgreen.svg)]()
 
 ## What is Sci-Orbit?
 
@@ -68,11 +68,12 @@ env_diff(snapshot_a, snapshot_b) # → risk assessment
 
 Infer implicit parameters that scientific tools require but AI agents don't know about:
 
-- **Templates**: VASP, LAMMPS, ABACUS parameter knowledge bases
+- **Templates**: VASP, LAMMPS, ABACUS, GPAW, CP2K, Quantum ESPRESSO parameter knowledge bases
 - **Inference**: Auto-detect metal vs. semiconductor → set correct smearing
 - **Confidence**: Every inferred parameter has a confidence score (0-1)
 - **Validation**: Check constraints (e.g., `ismear=0` requires `sigma < 0.1`)
-- **Generation**: Auto-generate INCAR / INPUT files from completed parameters
+- **Adaptive Learning**: Learns from user corrections, applies preferences on future completions
+- **Generation**: Auto-generate INCAR / INPUT / pw.x / CP2K input files from completed parameters
 
 ```bash
 param_complete(tool="vasp_dft", params={system: "Cu", encut: 500})
@@ -124,22 +125,27 @@ openclaw skill install sci-orbit
 
 ## Tool Reference (38+ MCP Tools)
 
-### Environment (4 tools)
+### Environment (5 tools)
 | Tool | Description |
 |------|-------------|
 | `env_detect` | Detect runtime environment |
 | `env_setup` | Generate environment configuration |
 | `env_snapshot` | Collect full reproducibility snapshot |
-| `env_diff` | Compare two environments |
+| `env_diff` | Compare two environments (supports text/CI mode) |
+| `env_check` | CI-friendly environment consistency check (exit codes: 0/1/2) |
 
-### Parameters (5 tools)
+### Parameters (9 tools)
 | Tool | Description |
 |------|-------------|
-| `param_complete` | Auto-complete implicit parameters |
+| `param_complete` | Auto-complete implicit parameters (6 tools supported) |
 | `param_validate` | Validate parameters without completion |
 | `param_list_templates` | List supported tool templates |
 | `param_generate_incar` | Generate VASP INCAR file |
 | `param_generate_abacus_input` | Generate ABACUS INPUT file |
+| `param_generate_qe_input` | Generate Quantum ESPRESSO pw.x input |
+| `param_generate_cp2k_input` | Generate CP2K input file |
+| `param_record_correction` | Record user correction for adaptive learning |
+| `param_generate_ci_workflow` | Generate GitHub Actions CI workflow template |
 
 ### Data Summary (3 tools)
 | Tool | Description |
@@ -197,16 +203,17 @@ claude mcp add sci-orbit -- node dist/server.js
 
 ## Development Roadmap
 
-### Phase 1 — Tool Intelligence ✅ (Current)
+### Phase 1 — Tool Intelligence ✅
 - [x] Environment snapshot & diff
 - [x] Parameter auto-completion (VASP, LAMMPS, ABACUS)
 - [x] Scientific data format summarizer
 - [x] 38 MCP tools, 104/104 tests passing
 
-### Phase 2 — Agent Orchestration 🚧
-- [ ] Plan-First state machine (classify → generate → validate → review → iterate)
-- [ ] Dual-model debate engine (proposer ↔ critic + judge)
-- [ ] Finetune execution engine (LLaMA Factory + GPU monitoring + resume)
+### Phase 2 — Extended Intelligence ✅
+- [x] New parameter templates: GPAW (DFT), CP2K (AIMD/hybrid), QE (surface science)
+- [x] Adaptive parameter inference (learn from user corrections, pattern matching)
+- [x] CI integration: env_check tool, text diff reports, GitHub Actions workflow template
+- [x] 44 MCP tools, 87/87 tests passing
 
 ### Phase 3 — Platform Integration
 - [ ] OpenClaw Skill (SKILL.md + subAgent + Cron)

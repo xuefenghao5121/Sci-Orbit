@@ -1,8 +1,12 @@
 /**
  * AI4S 参数智能补全服务
  * 根据环境信息和任务类型，自动推断和补全隐式参数
+ * v0.6.0: 新增 GPAW、CP2K、Quantum ESPRESSO 支持 + 自适应偏好学习
  */
 import { EnvironmentDetectorService, type EnvironmentInfo } from './environment-detector.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 /** 已知的科学计算工具参数模板 */
 interface ToolParamTemplate {
@@ -131,13 +135,127 @@ const TOOL_TEMPLATES: ToolParamTemplate[] = [
     defaults: { ecutwfc: 100, scf_nmax: 100, ediff: 1e-6, smearing_sigma: 0.02, smearing_method: 'gaussian', basis_type: 'lcao', gamma_only: false },
     constraints: [],
   },
+  {
+    name: 'gpaw_dft',
+    category: 'dft',
+    required_params: ['structure'],
+    optional_params: {
+      mode: { type: 'enum', description: 'Calculation mode', enum_values: ['lcao', 'pw', 'fd', 'gpw'], default: 'pw' },
+      xc: { type: 'string', description: 'Exchange-correlation functional', default: 'PBE' },
+      encut: { type: 'number', description: 'Plane-wave cutoff', unit: 'eV', default: 340 },
+      kpts: { type: 'object', description: 'K-point grid', default: [4, 4, 4] },
+      convergence: { type: 'object', description: 'Convergence criteria', default: { energy: 0.0005 } },
+      occupations: { type: 'number', description: 'Occupation method (0=Fermi, 1=Methfessel-Paxton)', default: 0 },
+      txt: { type: 'string', description: 'Output file path', default: 'gpaw.txt' },
+      parallel: { type: 'object', description: 'Parallel settings' },
+    },
+    implicit_params: {
+      encut: { description: '根据赝势推荐值', infer_from: ['params.setup_name'], rule: 'PAW默认340eV, 可提高到450eV', default_value: 340, risk_if_wrong: 'high' },
+      occupations: { description: '根据系统类型选择', infer_from: ['params.system'], rule: '金属用0(Fermi), 半导体/绝缘体用-1(fixed)', default_value: 0, risk_if_wrong: 'medium' },
+      mode: { description: '根据系统大小选择', infer_from: ['params.system_size'], rule: '大体系用LCAO, 中小体系用PW, 精确用FD', default_value: 'pw', risk_if_wrong: 'high' },
+    },
+    defaults: { mode: 'pw', xc: 'PBE', encut: 340, kpts: [4, 4, 4], convergence: { energy: 0.0005 }, occupations: 0, txt: 'gpaw.txt' },
+    constraints: [
+      { params: ['encut'], rule: 'encut应>=250eV', check: 'encut >= 250' },
+    ],
+  },
+  {
+    name: 'cp2k_dft',
+    category: 'dft',
+    required_params: ['coord_file', 'basis_set'],
+    optional_params: {
+      project_name: { type: 'string', description: 'Project name', default: 'CP2K' },
+      run_type: { type: 'enum', description: 'Calculation type', enum_values: ['ENERGY', 'ENERGY_FORCE', 'GEO_OPT', 'CELL_OPT', 'MD', 'BAND_STRUCTURE'], default: 'ENERGY_FORCE' },
+      kind: { type: 'enum', description: 'Basis set kind', enum_values: ['BASIS_SET', 'BASIS_SET_POTENTIAL'], default: 'BASIS_SET' },
+      potential_file: { type: 'string', description: 'GTH pseudopotential file' },
+      charge: { type: 'number', description: 'Total charge', default: 0 },
+      multiplicity: { type: 'number', description: 'Spin multiplicity', default: 1 },
+      cutoff: { type: 'number', description: 'Plane-wave cutoff', unit: 'Ry', default: 400 },
+      rel_cutoff: { type: 'number', description: 'Relative cutoff for aux basis', unit: 'Ry', default: 60 },
+      eps_scf: { type: 'number', description: 'SCF convergence', default: 1e-6 },
+      max_scf: { type: 'number', description: 'Max SCF iterations', default: 100 },
+      xc_functional: { type: 'string', description: 'XC functional', default: 'PBE' },
+      ukind: { type: 'enum', description: 'Spin treatment', enum_values: ['RESTRICTED', 'UNRESTRICTED', 'SPIN_ORBIT'], default: 'RESTRICTED' },
+      mgrid: { type: 'object', description: 'Multigrid settings', default: { ngpts: 4, cutoff: 400 } },
+    },
+    implicit_params: {
+      cutoff: { description: '根据基组类型调整', infer_from: ['params.basis_set'], rule: 'TZVP用400Ry, SZV-GTH用280Ry, DZVP-GTH用400Ry', default_value: 400, risk_if_wrong: 'high' },
+      rel_cutoff: { description: '相对截止能', infer_from: ['params.cutoff'], rule: '通常为cutoff的15%', default_value: 60, risk_if_wrong: 'medium' },
+      eps_scf: { description: '根据计算类型调整', infer_from: ['params.run_type'], rule: 'GEO_OPT用1e-6, MD用1e-5', default_value: 1e-6, risk_if_wrong: 'medium' },
+      ukind: { description: '磁性系统推断', infer_from: ['params.system'], rule: '含Fe/Co/Ni用UNRESTRICTED', default_value: 'RESTRICTED', risk_if_wrong: 'high' },
+    },
+    defaults: { project_name: 'CP2K', run_type: 'ENERGY_FORCE', kind: 'BASIS_SET', charge: 0, multiplicity: 1, cutoff: 400, rel_cutoff: 60, eps_scf: 1e-6, max_scf: 100, xc_functional: 'PBE', ukind: 'RESTRICTED' },
+    constraints: [
+      { params: ['cutoff', 'rel_cutoff'], rule: 'cutoff应远大于rel_cutoff', check: 'cutoff > rel_cutoff * 3' },
+      { params: ['eps_scf'], rule: 'eps_scf应合理', check: 'eps_scf > 0 && eps_scf < 1e-2' },
+    ],
+  },
+  {
+    name: 'qe_pw',
+    category: 'dft',
+    required_params: ['structure_file', 'pseudo_dir'],
+    optional_params: {
+      calculation: { type: 'enum', description: 'Calculation type', enum_values: ['scf', 'nscf', 'bands', 'relax', 'vc-relax', 'md', 'cp', 'vc-md'], default: 'scf' },
+      pseudo: { type: 'string', description: 'Pseudopotential name pattern', default: 'UPF' },
+      ecutwfc: { type: 'number', description: 'Kinetic energy cutoff for wavefunctions', unit: 'eV', default: 40 },
+      ecutrho: { type: 'number', description: 'Charge density cutoff', unit: 'eV', default: 320 },
+      kpoints: { type: 'object', description: 'K-point mesh', default: { type: 'automatic', grid: [4, 4, 4] } },
+      conv_thr: { type: 'number', description: 'SCF convergence threshold', unit: 'eV', default: 1e-8 },
+      electron_maxstep: { type: 'number', description: 'Max electron SCF steps', default: 100 },
+      mixing_beta: { type: 'number', description: 'Mixing factor for SCF', default: 0.7 },
+      smearing: { type: 'enum', description: 'Smearing type', enum_values: ['gaussian', 'fd', 'mp', 'mp2'], default: 'gaussian' },
+      degauss: { type: 'number', description: 'Smearing width', unit: 'eV', default: 0.01 },
+      occupations: { type: 'enum', description: 'Occupation method', enum_values: ['smearing', 'fixed', 'tetrahedra', 'tetrahedra_lin'], default: 'smearing' },
+      tstress: { type: 'boolean', description: 'Calculate stress', default: false },
+      tprnfor: { type: 'boolean', description: 'Calculate forces', default: false },
+      outdir: { type: 'string', description: 'Output directory', default: './out' },
+      prefix: { type: 'string', description: 'Output file prefix', default: 'pwscf' },
+    },
+    implicit_params: {
+      ecutrho: { description: '根据ecutwfc推断', infer_from: ['params.ecutwfc'], rule: '通常为ecutwfc的8-12倍', default_value: 320, risk_if_wrong: 'high' },
+      smearing: { description: '根据系统类型选择', infer_from: ['params.system'], rule: '金属用gaussian/fd, 半导体用tetrahedra', default_value: 'gaussian', risk_if_wrong: 'medium' },
+      degauss: { description: '根据smearing类型调整', infer_from: ['params.smearing'], rule: 'gaussian用0.01-0.02, fd用0.01', default_value: 0.01, risk_if_wrong: 'low' },
+      tprnfor: { description: '根据计算类型自动设置', infer_from: ['params.calculation'], rule: 'relax/vc-relax/md自动启用', default_value: false, risk_if_wrong: 'low' },
+      tstress: { description: '根据计算类型自动设置', infer_from: ['params.calculation'], rule: 'vc-relax自动启用', default_value: false, risk_if_wrong: 'low' },
+    },
+    defaults: { calculation: 'scf', ecutwfc: 40, ecutrho: 320, conv_thr: 1e-8, electron_maxstep: 100, mixing_beta: 0.7, smearing: 'gaussian', degauss: 0.01, occupations: 'smearing', tstress: false, tprnfor: false, outdir: './out', prefix: 'pwscf' },
+    constraints: [
+      { params: ['ecutwfc', 'ecutrho'], rule: 'ecutrho应>=ecutwfc的4倍', check: 'ecutrho >= ecutwfc * 4' },
+      { params: ['mixing_beta'], rule: 'mixing_beta应在合理范围', check: 'mixing_beta > 0 && mixing_beta < 1' },
+    ],
+  },
 ];
+
+/** 自适应偏好学习 */
+interface UserCorrection {
+  tool: string;
+  param: string;
+  auto_value: unknown;
+  user_value: unknown;
+  context: Record<string, unknown>;
+  timestamp: string;
+}
+
+interface PreferenceProfile {
+  corrections: UserCorrection[];
+  patterns: PreferencePattern[];
+}
+
+interface PreferencePattern {
+  tool: string;
+  param: string;
+  preferred_value: unknown;
+  match_conditions: Record<string, string>;
+  count: number;
+}
 
 export class ParamCompleterService {
   private envService: EnvironmentDetectorService;
+  private prefsPath: string;
 
-  constructor() {
+  constructor(prefsPath?: string) {
     this.envService = new EnvironmentDetectorService();
+    this.prefsPath = prefsPath || join(homedir(), '.ai4s', 'preferences.json');
   }
 
   /** 查找匹配的参数模板 */
@@ -200,6 +318,15 @@ export class ParamCompleterService {
       }
 
       // 尝试推断（使用累积的参数，包含已推断出的值）
+      // 先查偏好
+      const pref = this.findPreference(userParams.tool, key, accumulatedParams);
+      if (pref !== null) {
+        implicit[key] = pref;
+        confidence[key] = 0.85;
+        accumulatedParams[key] = pref;
+        continue;
+      }
+
       const inferred = this.inferParam(key, rule, accumulatedParams, env);
       implicit[key] = inferred.value;
       confidence[key] = inferred.confidence;
@@ -215,11 +342,17 @@ export class ParamCompleterService {
       }
     }
 
-    // 3. 填充缺失的 optional 参数默认值
+    // 3. 填充缺失的 optional 参数默认值（优先查偏好）
     for (const [key, spec] of Object.entries(template.optional_params)) {
-      if (!(key in userParams.params) && !(key in implicit) && spec.default !== undefined) {
-        implicit[key] = spec.default;
-        confidence[key] = 0.95;
+      if (!(key in userParams.params) && !(key in implicit)) {
+        const pref = this.findPreference(userParams.tool, key, accumulatedParams);
+        if (pref !== null) {
+          implicit[key] = pref;
+          confidence[key] = 0.85;
+        } else if (spec.default !== undefined) {
+          implicit[key] = spec.default;
+          confidence[key] = 0.95;
+        }
       }
     }
 
@@ -289,6 +422,156 @@ export class ParamCompleterService {
       lines.push(`${key} ${value}`);
     }
     return lines.join('\n');
+  }
+
+  /** 生成 Quantum ESPRESSO pw.x 输入文件内容 */
+  generateQeInput(params: Record<string, any>): string {
+    const lines = ['&CONTROL', `  calculation = '${params.calculation || 'scf'}'`, `  prefix = '${params.prefix || 'pwscf'}'`, `  outdir = '${params.outdir || './out'}'`, `  tstress = ${params.tstress ? '.true.' : '.false.'}`, `  tprnfor = ${params.tprnfor ? '.true.' : '.false.'}`, '/'];
+    lines.push('', '&SYSTEM');
+    if (params.ibrav !== undefined) lines.push(`  ibrav = ${params.ibrav}`);
+    if (params.nat !== undefined) lines.push(`  nat = ${params.nat}`);
+    if (params.ntyp !== undefined) lines.push(`  ntyp = ${params.ntyp}`);
+    lines.push(`  ecutwfc = ${params.ecutwfc || 40}`, `  ecutrho = ${params.ecutrho || 320}`, '/');
+    lines.push('', '&ELECTRONS', `  conv_thr = ${params.conv_thr || '1.0e-8'}`, `  mixing_beta = ${params.mixing_beta || 0.7}`, `  electron_maxstep = ${params.electron_maxstep || 100}`, '/');
+    if (params.occupations === 'smearing') {
+      lines.push('', '&IONS', '/', '', 'ATOMIC_SPECIES');
+    }
+    return lines.join('\n');
+  }
+
+  /** 生成 CP2K 输入文件内容 */
+  generateCp2kInput(params: Record<string, any>): string {
+    const lines = [`&FORCE_EVAL`, `  METHOD QUICKSTEP`, `  &SUBSYS`];
+    if (params.coord_file) lines.push(`    &COORD`);
+    lines.push(`      @INCLUDE ${params.coord_file || 'coords.xyz'}`);
+    lines.push(`    &END`, `    &KIND`);
+    lines.push(`      BASIS_SET ${params.basis_set || 'DZVP-GTH'}`);
+    if (params.potential_file) lines.push(`      POTENTIAL ${params.potential_file}`);
+    lines.push(`    &END`, `  &END`, `  &DFT`);
+    lines.push(`    ${params.xc_functional ? '&XC' : ''}`);
+    if (params.xc_functional) {
+      lines.push(`      FUNCTIONAL ${params.xc_functional}`);
+      lines.push(`    &END`);
+    }
+    lines.push(`    &MGRID`, `      CUTOFF ${params.cutoff || 400}`, `      REL_CUTOFF ${params.rel_cutoff || 60}`, `    &END`);
+    lines.push(`    &SCF`, `      EPS_SCF ${params.eps_scf || '1.0E-6'}`, `      MAX_SCF ${params.max_scf || 100}`, `    &END`);
+    lines.push(`  &END`, `&END`);
+    return lines.join('\n');
+  }
+
+  // --- 自适应偏好学习 ---
+
+  /** 加载偏好文件 */
+  private loadPreferences(): PreferenceProfile {
+    try {
+      if (existsSync(this.prefsPath)) {
+        return JSON.parse(readFileSync(this.prefsPath, 'utf8'));
+      }
+    } catch { /* ignore */ }
+    return { corrections: [], patterns: [] };
+  }
+
+  /** 保存偏好文件 */
+  private savePreferences(prefs: PreferenceProfile): void {
+    const dir = join(this.prefsPath, '..');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(this.prefsPath, JSON.stringify(prefs, null, 2));
+  }
+
+  /** 记录用户纠正 */
+  recordCorrection(tool: string, param: string, autoValue: any, userValue: any, context: Record<string, any> = {}): void {
+    const prefs = this.loadPreferences();
+    prefs.corrections.push({
+      tool, param,
+      auto_value: autoValue,
+      user_value: userValue,
+      context,
+      timestamp: new Date().toISOString(),
+    });
+    // 更新模式
+    this.updatePatterns(prefs);
+    this.savePreferences(prefs);
+  }
+
+  /** 从纠正中提取模式 */
+  private updatePatterns(prefs: PreferenceProfile): void {
+    const corr = prefs.corrections;
+    // 按 tool+param+context 相似度聚合
+    const buckets = new Map<string, PreferencePattern>();
+    for (const c of corr) {
+      const key = `${c.tool}:${c.param}`;
+      // 从context提取简单匹配条件
+      const conditions: Record<string, string> = {};
+      for (const [k, v] of Object.entries(c.context)) {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+          conditions[k] = String(v);
+        }
+      }
+      const condKey = JSON.stringify(conditions);
+      const bucketKey = `${key}:${condKey}`;
+
+      if (buckets.has(bucketKey)) {
+        const p = buckets.get(bucketKey)!;
+        p.count++;
+        p.preferred_value = c.user_value;
+      } else {
+        buckets.set(bucketKey, {
+          tool: c.tool,
+          param: c.param,
+          preferred_value: c.user_value,
+          match_conditions: conditions,
+          count: 1,
+        });
+      }
+    }
+    prefs.patterns = Array.from(buckets.values());
+  }
+
+  /** 查找匹配的偏好 */
+  private findPreference(tool: string, param: string, context: Record<string, any>): any | null {
+    const prefs = this.loadPreferences();
+    for (const pattern of prefs.patterns) {
+      if (pattern.tool !== tool || pattern.param !== param) continue;
+      if (pattern.count < 2) continue; // 至少2次才认为有效
+      // 检查匹配条件
+      let match = true;
+      for (const [k, v] of Object.entries(pattern.match_conditions)) {
+        if (context[k] !== undefined && String(context[k]) !== v) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return pattern.preferred_value;
+    }
+    return null;
+  }
+
+  /** 导出 GitHub Actions workflow 模板（CI集成） */
+  generateCIWorkflow(snapshotBaselinePath: string, outputPath?: string): string {
+    const workflow = `name: AI4S Environment Check
+on: [push, pull_request]
+
+jobs:
+  env-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install ai4s-cli
+        run: npm install -g @ai4s/orchestrator
+      - name: Check environment consistency
+        run: |
+          ai4s env-check --baseline ${snapshotBaselinePath} --format text --ci
+        # Exit codes: 0=consistent, 1=differences found, 2=error
+`;
+    if (outputPath) {
+      const dir = join(outputPath, '..');
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(outputPath, workflow);
+    }
+    return workflow;
   }
 
   // --- 私有方法 ---

@@ -3,7 +3,7 @@
 > 🔬 Scientific Computing Enhancement Toolkit for AI Coding Agents — bridging Claude Code, OpenClaw, and beyond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0--dev-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-0.5.0-orange.svg)]()
 [![Tests](https://img.shields.io/badge/tests-104%2F104-brightgreen.svg)]()
 
 ## What is Sci-Orbit?

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 import { logger } from "./utils/logger.js";
+import { VERSION } from "./version.js";
 
 const BOOT_START = performance.now();
 
 async function main() {
-  logger.info("ai4s-orchestrator v0.4.0 initializing...");
+  logger.info(`ai4s-orchestrator v${VERSION} initializing...`);
   logger.info(`Node.js: ${process.version} | PID: ${process.pid}`);
 
   const { configService } = await import("./services/config.js");

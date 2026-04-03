@@ -1,8 +1,9 @@
 /**
  * 参数智能补全 MCP tools
  */
-import type { MCPToolDefinition } from '../plan-first/index.js';
+import type { MCPToolDefinition } from '../types.js';
 import { ParamCompleterService } from '../../services/param-completer.js';
+import { AI4SError, AI4SErrorCode, wrapError } from '../../utils/errors.js';
 
 const service = new ParamCompleterService();
 
@@ -18,7 +19,10 @@ export const paramCompleteTools: MCPToolDefinition<unknown, unknown>[] = [
       },
       required: ['tool', 'params'],
     },
-    handler: async (input) => service.complete(input as any),
+    handler: async (input) => {
+      try { return await service.complete(input as { tool: string; params: Record<string, unknown> }); }
+      catch (e) { throw wrapError(e, AI4SErrorCode.PARAM_INVALID); }
+    },
   },
   {
     name: 'param_validate',
@@ -31,13 +35,19 @@ export const paramCompleteTools: MCPToolDefinition<unknown, unknown>[] = [
       },
       required: ['tool', 'params'],
     },
-    handler: async (input) => service.validate(input as any),
+    handler: async (input) => {
+      try { return await service.validate(input as { tool: string; params: Record<string, unknown> }); }
+      catch (e) { throw wrapError(e, AI4SErrorCode.PARAM_INVALID); }
+    },
   },
   {
     name: 'param_list_templates',
     description: 'List all supported tool parameter templates',
     inputSchema: { type: 'object', properties: {} },
-    handler: async () => service.listTemplates(),
+    handler: async () => {
+      try { return await service.listTemplates(); }
+      catch (e) { throw wrapError(e); }
+    },
   },
   {
     name: 'param_generate_incar',
@@ -50,14 +60,18 @@ export const paramCompleteTools: MCPToolDefinition<unknown, unknown>[] = [
       },
       required: ['params'],
     },
-    handler: async (input: any) => {
-      const content = service.generateIncar(input.params);
-      if (input.output_path) {
-        const { writeFileSync } = await import('fs');
-        writeFileSync(input.output_path, content);
-        return { content, saved_to: input.output_path };
-      }
-      return { content };
+    handler: async (input) => {
+      const { params, output_path } = input as { params: Record<string, unknown>; output_path?: string };
+      try {
+        const content = service.generateIncar(params);
+        if (output_path) {
+          const { writeFileSync } = await import('fs');
+          try { writeFileSync(output_path, content); }
+          catch (e) { throw wrapError(e, AI4SErrorCode.FILE_SYSTEM_ERROR); }
+          return { content, saved_to: output_path };
+        }
+        return { content };
+      } catch (e) { throw wrapError(e, AI4SErrorCode.PARAM_INVALID); }
     },
   },
   {
@@ -71,14 +85,18 @@ export const paramCompleteTools: MCPToolDefinition<unknown, unknown>[] = [
       },
       required: ['params'],
     },
-    handler: async (input: any) => {
-      const content = service.generateAbacusInput(input.params);
-      if (input.output_path) {
-        const { writeFileSync } = await import('fs');
-        writeFileSync(input.output_path, content);
-        return { content, saved_to: input.output_path };
-      }
-      return { content };
+    handler: async (input) => {
+      const { params, output_path } = input as { params: Record<string, unknown>; output_path?: string };
+      try {
+        const content = service.generateAbacusInput(params);
+        if (output_path) {
+          const { writeFileSync } = await import('fs');
+          try { writeFileSync(output_path, content); }
+          catch (e) { throw wrapError(e, AI4SErrorCode.FILE_SYSTEM_ERROR); }
+          return { content, saved_to: output_path };
+        }
+        return { content };
+      } catch (e) { throw wrapError(e, AI4SErrorCode.PARAM_INVALID); }
     },
   },
 ];

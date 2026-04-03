@@ -1,8 +1,9 @@
 /**
  * 科学数据格式摘要 MCP tools
  */
-import type { MCPToolDefinition } from '../plan-first/index.js';
+import type { MCPToolDefinition } from '../types.js';
 import { DataSummarizerService } from '../../services/data-summarizer.js';
+import { wrapError, AI4SErrorCode } from '../../utils/errors.js';
 
 const service = new DataSummarizerService();
 
@@ -17,7 +18,10 @@ export const dataSummaryTools: MCPToolDefinition<unknown, unknown>[] = [
       },
       required: ['file_path'],
     },
-    handler: async (input: any) => service.summarize(input.file_path),
+    handler: async (input) => {
+      try { return await service.summarize((input as { file_path: string }).file_path); }
+      catch (e) { throw wrapError(e, AI4SErrorCode.FILE_SYSTEM_ERROR); }
+    },
   },
   {
     name: 'data_summarize_dir',
@@ -29,12 +33,18 @@ export const dataSummaryTools: MCPToolDefinition<unknown, unknown>[] = [
       },
       required: ['dir_path'],
     },
-    handler: async (input: any) => service.summarizeDirectory(input.dir_path),
+    handler: async (input) => {
+      try { return await service.summarizeDirectory((input as { dir_path: string }).dir_path); }
+      catch (e) { throw wrapError(e, AI4SErrorCode.FILE_SYSTEM_ERROR); }
+    },
   },
   {
     name: 'data_supported_formats',
     description: 'List all supported scientific data formats',
     inputSchema: { type: 'object', properties: {} },
-    handler: async () => service.supportedFormats(),
+    handler: async () => {
+      try { return await service.supportedFormats(); }
+      catch (e) { throw wrapError(e); }
+    },
   },
 ];

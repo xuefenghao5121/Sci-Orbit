@@ -4,7 +4,7 @@ import { configService } from "../services/config.js";
 
 export function registerAi4sStatusResource(server: McpServer): void {
   server.resource("ai4s-status", "ai4s://status", async () => {
-    const env = environmentDetector.detect();
+    const env = await environmentDetector.detect();
     const config = configService.getAll();
     const errors = configService.validate();
 

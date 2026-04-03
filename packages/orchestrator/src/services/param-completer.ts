@@ -173,7 +173,7 @@ export class ParamCompleterService {
     // 尝试采集环境信息（优雅降级）
     let env: EnvironmentInfo | null = null;
     try {
-      env = this.envService.detect();
+      env = await this.envService.detect();
     } catch (error) {
       // 环境采集失败，继续使用默认值
       warnings.push({

@@ -5,13 +5,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerTools } from "./tools/index.js";
 import { registerResources } from "./resources/index.js";
 import { logger } from "./utils/logger.js";
+import { VERSION } from "./version.js";
 
 async function main() {
-  logger.info("Starting ai4s-orchestrator v0.4.0...");
+  logger.info(`Starting ai4s-orchestrator v${VERSION}...`);
 
   const server = new McpServer({
     name: "ai4s-orchestrator",
-    version: "0.4.0",
+    version: VERSION,
   });
 
   registerResources(server);

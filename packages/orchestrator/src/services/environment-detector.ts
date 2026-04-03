@@ -1,5 +1,18 @@
-import { execSync } from "node:child_process";
+/**
+ * 环境检测服务 — 轻量级环境信息采集
+ * 注意：与 EnvSnapshotService 不同，这里提供 EnvironmentInfo 结构供 param-completer 等模块使用
+ */
+import { execFile } from "node:child_process";
 import * as os from "node:os";
+import { promisify } from "util";
+
+const execFileAsync = promisify(execFile);
+
+async function execCmd(cmd: string, timeout = 5000): Promise<string> {
+  return execFileAsync('sh', ['-c', cmd], { timeout, encoding: 'utf-8' })
+    .then(r => r.stdout.trim())
+    .catch(() => '');
+}
 
 export interface EnvironmentInfo {
   os: { platform: string; arch: string; release: string };
@@ -12,7 +25,7 @@ export interface EnvironmentInfo {
 }
 
 export class EnvironmentDetectorService {
-  detect(): EnvironmentInfo {
+  async detect(): Promise<EnvironmentInfo> {
     const info: EnvironmentInfo = {
       os: { platform: process.platform, arch: process.arch, release: os.release() },
       cpu: { model: "", cores: 0 },
@@ -26,36 +39,27 @@ export class EnvironmentDetectorService {
       info.memory.freeGb = Math.round(os.freemem() / 1024 / 1024 / 1024);
     } catch {}
 
-    // CPU model
-    try {
-      const cpuInfo = execSync("cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1", { encoding: "utf-8" });
-      if (cpuInfo) info.cpu.model = cpuInfo.split(":")[1]?.trim() || "";
-    } catch {}
+    const [cpuInfo, gpuInfo, pyVer, pyPath, nvcc] = await Promise.all([
+      execCmd("cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1"),
+      execCmd("nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null"),
+      execCmd("python3 --version 2>/dev/null"),
+      execCmd("which python3 2>/dev/null"),
+      execCmd("nvcc --version 2>/dev/null"),
+    ]);
 
-    // GPU
-    try {
-      const gpuInfo = execSync("nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
-      if (gpuInfo) {
-        const parts = gpuInfo.trim().split(",");
-        info.gpu = { model: parts[0]?.trim() || "", driver: parts[1]?.trim() || "", vram: parts[2]?.trim() || "" };
-      }
-    } catch {}
+    if (cpuInfo) info.cpu.model = cpuInfo.split(":")[1]?.trim() || "";
 
-    // Python
-    try {
-      const pyVer = execSync("python3 --version 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
-      const pyPath = execSync("which python3 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
-      if (pyVer) info.python = { version: pyVer.trim(), path: pyPath.trim() };
-    } catch {}
+    if (gpuInfo) {
+      const parts = gpuInfo.trim().split(",");
+      info.gpu = { model: parts[0]?.trim() || "", driver: parts[1]?.trim() || "", vram: parts[2]?.trim() || "" };
+    }
 
-    // CUDA
-    try {
-      const nvcc = execSync("nvcc --version 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
-      if (nvcc) {
-        const match = nvcc.match(/release (\S+)/);
-        info.cuda = { version: match?.[1] || "", available: true };
-      }
-    } catch {
+    if (pyVer) info.python = { version: pyVer.trim(), path: pyPath.trim() };
+
+    if (nvcc) {
+      const match = nvcc.match(/release (\S+)/);
+      info.cuda = { version: match?.[1] || "", available: true };
+    } else {
       info.cuda = { version: "", available: false };
     }
 

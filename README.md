@@ -85,24 +85,56 @@ env_snapshot(format="conda")     # → environment.yml
 env_diff(snapshot_a, snapshot_b) # → risk assessment
 ```
 
-### 🔧 Parameter Intelligence
+### 🔧 Parameter Intelligence (Final Version)
 
-Infer implicit parameters that scientific tools require but AI agents don't know about:
+**Parameter Completer Service** is the flagship capability of Sci-Orbit — it solves the *implicit parameter problem* that plagues AI-generated scientific computing inputs. General AI agents only see what you write explicitly, but scientific computing packages have thousands of implicit conventions based on physical system type.
 
-- **Templates**: VASP, LAMMPS, ABACUS, GPAW, CP2K, Quantum ESPRESSO parameter knowledge bases
-- **Inference**: Auto-detect metal vs. semiconductor → set correct smearing
-- **Confidence**: Every inferred parameter has a confidence score (0-1)
-- **Validation**: Check constraints (e.g., `ismear=0` requires `sigma < 0.1`)
-- **Adaptive Learning**: Learns from user corrections, applies preferences on future completions
-- **Generation**: Auto-generate INCAR / INPUT / pw.x / CP2K input files from completed parameters
+**Final Architecture (v1.0)**:
+- **Multi-layered inference pipeline**: Context classification → template matching → constraint validation → confidence scoring
+- **Four supported major packages**: VASP, LAMMPS, ABACUS, GROMACS
+- **Extensible template system**: Easy to add new tools via JSON/YAML templates
+- **Adaptive learning**: Records user corrections and improves over time
+- **Full type safety**: TypeScript implementation with complete error handling
+
+**Key Features**:
+
+| Feature | Description |
+|---------|-------------|
+| **System Type Detection** | Auto-detects metal vs. semiconductor, insulator vs. metal → sets correct smearing/k-points |
+| **Constraint Validation** | Checks physical constraints (e.g., `ismear=0` for Gaussian smearing requires `sigma < 0.2`) |
+| **Confidence Scoring** | Every inferred parameter has a 0-1 confidence score → warnings for low-confidence inferences |
+| **Input Generation** | Directly generate `INCAR` (VASP), `INPUT` (ABACUS), `pw.x` (QE), `*.mdp` (GROMACS) input files |
+| **Adaptive Learning** | `param_record_correction` learns user preferences for future completions |
+| **Environment Awareness** | Uses detected GPU/CPU/MPI to set parallelization parameters automatically |
+
+```typescript
+// TypeScript API usage (in Sci-Orbit)
+import { ParamCompleterFinal } from './services/param-completer-final';
+
+const completer = new ParamCompleterFinal();
+const result = await completer.complete({
+  tool: 'vasp',
+  systemType: 'metal', // Cu fcc crystal
+  userParams: { encut: 500, kpoints: [8, 8, 8] }
+});
+
+// result.completedParams includes all implicitly completed parameters
+// result.warnings contains low-confidence inferences for user review
+// result.confidence scores for each inferred parameter
+```
 
 ```bash
-param_complete(tool="vasp_dft", params={system: "Cu", encut: 500})
+# MCP tool call example
+param_complete(tool="vasp", params={system: "Cu", encut: 500})
 # → adds implicit: ismear=1, sigma=0.2, prec=accurate (metal detected!)
-# → warning: "Cu appears metallic, using ismear=1 (confidence: 70%)"
+# → warning: "Cu appears metallic, using ismear=1 (confidence: 0.7)"
 
 param_generate_incar(params, output_path="INCAR")
 ```
+
+**Supported Tools**: VASP (DFT), LAMMPS (MD), ABACUS (DFT), GROMACS (MD) — more coming soon!
+
+**Detailed documentation**: See [docs/param-completer-user-guide.md](docs/param-completer-user-guide.md) for complete user guide and [docs/param-completer-final-design.md](docs/param-completer-final-design.md) for architecture design.
 
 ### 📊 Scientific Data Understanding
 

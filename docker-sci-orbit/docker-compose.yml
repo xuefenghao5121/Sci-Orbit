@@ -1,0 +1,138 @@
+# docker-compose.yml - OpenClaw + Sci-Orbit 完整部署配置
+# 使用方法:
+#   1. cp .env.example .env && 编辑 .env 文件
+#   2. docker compose up -d
+
+services:
+  openclaw-sci-orbit:
+    build:
+      context: ..
+      dockerfile: docker-sci-orbit/Dockerfile
+    image: openclaw-sci-orbit:latest
+    container_name: openclaw-sci-orbit
+    
+    # 环境变量配置（从 .env 文件读取）
+    env_file:
+      - .env
+    
+    environment:
+      # Gateway 认证令牌（必须设置）
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      
+      # 飞书配置（必须设置）
+      - OPENCLAW_FEISHU_APP_ID=${OPENCLAW_FEISHU_APP_ID}
+      - OPENCLAW_FEISHU_APP_SECRET=${OPENCLAW_FEISHU_APP_SECRET}
+      
+      # 模型 API 配置
+      - OPENCLAW_ZAI_API_KEY=${OPENCLAW_ZAI_API_KEY:-}
+      - OPENCLAW_BAILIAN_API_KEY=${OPENCLAW_BAILIAN_API_KEY:-}
+      - OPENCLAW_MODEL_PRIMARY=${OPENCLAW_MODEL_PRIMARY:-zai/glm-5}
+      
+      # 可选：强制更新配置
+      - FORCE_CONFIG_UPDATE=${FORCE_CONFIG_UPDATE:-false}
+      
+      # Gateway 运行模式
+      - OPENCLAW_GATEWAY_MODE=local
+      - OPENCLAW_HOME=/root/.openclaw
+    
+    # 覆盖默认命令（使用前台模式）
+    command: ["gateway"]
+    
+    # 端口映射
+    ports:
+      - "18790:18789"  # Gateway API (主机使用 18790 避免冲突)
+    
+    # 卷挂载 - 持久化配置
+    volumes:
+      # 工作区持久化（代码、项目文件）
+      - openclaw-workspace:/root/.openclaw/workspace
+      # 日志持久化
+      - openclaw-logs:/root/.openclaw/logs
+      # 配置持久化（允许手动修改配置）
+      - openclaw-config:/root/.openclaw
+      # 会话状态持久化
+      - openclaw-sessions:/root/.openclaw/sessions
+      # 共享 HPC 数据目录（可选）
+      - ${HPC_DATA_PATH:-./hpc-data}:/hpc-data:rw
+    
+    # 网络配置
+    networks:
+      - openclaw-network
+    
+    # 重启策略：除非手动停止，否则自动重启（保证飞书连接稳定）
+    restart: unless-stopped
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+    
+    # 标准输出
+    stdin_open: true
+    tty: true
+
+  # 可选：Jupyter Notebook 服务（用于数据分析）
+  jupyter:
+    image: openclaw-sci-orbit:latest
+    container_name: openclaw-jupyter
+    command: ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+    ports:
+      - "8888:8888"
+    volumes:
+      - openclaw-workspace:/root/.openclaw/workspace
+      - ${HPC_DATA_PATH:-./hpc-data}:/hpc-data:rw
+    networks:
+      - openclaw-network
+    profiles:
+      - jupyter
+
+  # 可选：用于测试的简单 HTTP 服务
+  test-server:
+    image: nginx:alpine
+    container_name: openclaw-test-server
+    ports:
+      - "8080:80"
+    volumes:
+      - ./test-results:/usr/share/nginx/html:ro
+    networks:
+      - openclaw-network
+    profiles:
+      - test
+
+networks:
+  openclaw-network:
+    driver: bridge
+
+volumes:
+  # OpenClaw 工作区（代码、项目）
+  openclaw-workspace:
+    driver: local
+  # OpenClaw 日志
+  openclaw-logs:
+    driver: local
+  # OpenClaw 配置
+  openclaw-config:
+    driver: local
+  # OpenClaw 会话状态
+  openclaw-sessions:
+    driver: local

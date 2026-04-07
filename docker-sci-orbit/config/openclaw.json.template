@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.4.3",
+    "lastTouchedAt": "TIMESTAMP_PLACEHOLDER"
+  },
+  "browser": {
+    "enabled": false,
+    "headless": true,
+    "noSandbox": true
+  },
+  "auth": {
+    "profiles": {
+      "zai:default": {
+        "provider": "zai",
+        "mode": "api_key"
+      }
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "zai": {
+        "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+        "apiKey": "ZAI_API_KEY_PLACEHOLDER",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "glm-5",
+            "name": "GLM-5",
+            "contextWindow": 204800,
+            "maxTokens": 131072
+          },
+          {
+            "id": "glm-4.7",
+            "name": "GLM-4.7",
+            "contextWindow": 204800,
+            "maxTokens": 131072
+          }
+        ]
+      },
+      "bailian": {
+        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
+        "apiKey": "BAILIAN_API_KEY_PLACEHOLDER",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "qwen3.5-plus",
+            "name": "qwen3.5-plus",
+            "contextWindow": 1000000,
+            "maxTokens": 65536
+          },
+          {
+            "id": "qwen3-max-2026-01-23",
+            "name": "qwen3-max-2026-01-23",
+            "contextWindow": 262144,
+            "maxTokens": 65536
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "MODEL_PRIMARY_PLACEHOLDER",
+        "fallbacks": ["zai/glm-5", "bailian/qwen3.5-plus"]
+      },
+      "workspace": "/root/.openclaw/workspace",
+      "compaction": {
+        "mode": "safeguard"
+      }
+    }
+  },
+  "tools": {
+    "profile": "full"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "channels": {
+    "feishu": {
+      "enabled": true,
+      "defaultAccount": "main",
+      "dmPolicy": "open",
+      "historyLimit": 1,
+      "renderMode": "raw",
+      "streaming": false,
+      "textChunkLimit": 1024,
+      "chunkMode": "length",
+      "accounts": {
+        "main": {
+          "appId": "FEISHU_APP_ID_PLACEHOLDER",
+          "appSecret": "FEISHU_APP_SECRET_PLACEHOLDER",
+          "dmPolicy": "open"
+        }
+      },
+      "connectionMode": "websocket"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "0.0.0.0",
+    "auth": {
+      "mode": "token",
+      "token": "GATEWAY_TOKEN_PLACEHOLDER"
+    }
+  },
+  "mcp": {
+    "servers": {
+      "sci-orbit": {
+        "command": "node",
+        "args": ["/app/ai4s-cli/packages/orchestrator/dist/index.js"]
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "feishu": {
+        "enabled": true,
+        "config": {}
+      },
+      "sci-orbit": {
+        "enabled": true,
+        "config": {}
+      }
+    },
+    "installs": {
+      "sci-orbit": {
+        "source": "path",
+        "sourcePath": "/app/ai4s-cli/packages/openclaw-plugin",
+        "installPath": "/root/.openclaw/extensions/sci-orbit",
+        "version": "0.1.0"
+      }
+    }
+  }
+}

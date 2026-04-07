@@ -132,9 +132,11 @@ param_complete(tool="vasp", params={system: "Cu", encut: 500})
 param_generate_incar(params, output_path="INCAR")
 ```
 
-**Supported Tools**: VASP (DFT), LAMMPS (MD), ABACUS (DFT), GROMACS (MD) — more coming soon!
+**Supported Tools**: VASP (DFT), LAMMPS (MD), ABACUS (DFT), GROMACS (MD), Quantum ESPRESSO (DFT), CP2K (DFT/AIMD) — more coming soon!
 
 **Detailed documentation**: See [docs/param-completer-user-guide.md](docs/param-completer-user-guide.md) for complete user guide and [docs/param-completer-final-design.md](docs/param-completer-final-design.md) for architecture design.
+
+**Container Testing**: See [CONTAINER_TEST_GUIDE.md](CONTAINER_TEST_GUIDE.md) for Docker/Podman testing instructions with multi-architecture support.
 
 ### 📊 Scientific Data Understanding
 
@@ -290,10 +292,12 @@ Sci-Orbit fills a **strategic position in the AI4S ecosystem:
 - [x] 38 MCP tools, 104/104 tests passing
 
 ### Phase 2 — Extended Intelligence ✅ **Completed**
-- [x] New parameter templates: GPAW (DFT), CP2K (AIMD/hybrid), QE (surface science)
+- [x] New parameter templates: GROMACS, QE, CP2K
+- [x] Hierarchical inference engine with confidence scoring
 - [x] Adaptive parameter inference (learn from user corrections, pattern matching)
 - [x] CI integration: env_check tool, text diff reports, GitHub Actions workflow template
-- [x] 44 MCP tools, 87/87 tests passing
+- [x] Container testing guide (Docker/Podman, multi-arch)
+- [x] 17 core tools, 87/87 tests passing
 
 ### Phase 3 — Platform Integration 🚧 **In Progress**
 - [x] OpenClaw integration (this repository)

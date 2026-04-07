@@ -2,6 +2,52 @@
 
 All notable changes to Sci-Orbit will be documented in this file.
 
+## [0.6.0] - 2026-04-07
+
+### ✅ Parameter Completer V2 Complete
+
+#### Added
+- **Hierarchical Inference Engine**: Multi-layered parameter inference pipeline
+  - Context classification (system type, calculation type)
+  - Template matching with confidence scoring
+  - Constraint validation (physical constraints)
+  - Environment-aware parameter selection
+
+- **Enhanced Tool Support**
+  - GROMACS `.mdp` generator with scenario-based templates
+    - Energy minimization
+    - NVT equilibration
+    - NPT equilibration
+    - Production MD
+  - Quantum ESPRESSO `pw.x` input generator
+  - CP2K input file generator
+
+- **Adaptive Learning**
+  - `param_record_correction` learns user preferences
+  - Improves inference accuracy over time
+  - Stores correction history
+
+- **CI/CD Integration**
+  - `env_check` tool for CI-friendly environment checks
+  - `param_generate_ci_workflow` for GitHub Actions templates
+  - Exit code based status reporting
+
+- **Container Testing Guide**
+  - Comprehensive Docker/Podman testing documentation
+  - Multi-architecture support (x86_64, ARM64)
+  - Network isolation and security best practices
+
+#### Improved
+- Confidence scoring: Every inferred parameter has 0-1 score
+- Warning system: Low-confidence inferences flagged for review
+- Type safety: Complete TypeScript error handling
+- Template extensibility: JSON/YAML templates for easy addition
+
+#### Infrastructure
+- Updated documentation (README, user guide, design docs)
+- 17 core tools from v0.5.0 (continued from tool refactoring)
+- All tests passing (87/87)
+
 ## [0.5.0] - 2026-04-01
 
 ### ⚠️ Breaking Change — 工具精简 (38 → 17)

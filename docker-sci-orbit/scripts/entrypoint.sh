@@ -72,6 +72,44 @@ if [ ! -f "$CONFIG_FILE" ] || [ "${FORCE_CONFIG_UPDATE:-false}" = "true" ]; then
     "headless": true,
     "noSandbox": true
   },
+  "auth": {
+    "profiles": {
+      "volcengine-plan:default": {
+        "provider": "volcengine-plan",
+        "mode": "api_key"
+      }
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "volcengine-plan": {
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "apiKey": "VOLCENGINE_API_KEY_PLACEHOLDER",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "glm-4.7",
+            "name": "GLM-4.7",
+            "contextWindow": 204800,
+            "maxTokens": 131072
+          },
+          {
+            "id": "doubao-seed-code",
+            "name": "Doubao Seed Code",
+            "contextWindow": 128000,
+            "maxTokens": 65536
+          },
+          {
+            "id": "deepseek-v3.2",
+            "name": "DeepSeek V3.2",
+            "contextWindow": 128000,
+            "maxTokens": 65536
+          }
+        ]
+      }
+    }
+  },
   "tools": {
     "profile": "full"
   },
@@ -86,6 +124,10 @@ if [ ! -f "$CONFIG_FILE" ] || [ "${FORCE_CONFIG_UPDATE:-false}" = "true" ]; then
   },
   "agents": {
     "defaults": {
+      "model": {
+        "primary": "MODEL_PRIMARY_PLACEHOLDER",
+        "fallbacks": ["volcengine-plan/doubao-seed-code", "volcengine-plan/deepseek-v3.2"]
+      },
       "workspace": "/root/.openclaw/workspace"
     }
   }
@@ -98,9 +140,8 @@ CONFIGEOF
     sed -i "s|GATEWAY_TOKEN_PLACEHOLDER|${OPENCLAW_GATEWAY_TOKEN:-default-token}|g" "$CONFIG_FILE"
     sed -i "s|FEISHU_APP_ID_PLACEHOLDER|${OPENCLAW_FEISHU_APP_ID:-cli_xxx}|g" "$CONFIG_FILE"
     sed -i "s|FEISHU_APP_SECRET_PLACEHOLDER|${OPENCLAW_FEISHU_APP_SECRET:-xxx}|g" "$CONFIG_FILE"
-    sed -i "s|ZAI_API_KEY_PLACEHOLDER|${OPENCLAW_ZAI_API_KEY:-your-zai-key}|g" "$CONFIG_FILE"
-    sed -i "s|BAILIAN_API_KEY_PLACEHOLDER|${OPENCLAW_BAILIAN_API_KEY:-your-bailian-key}|g" "$CONFIG_FILE"
-    sed -i "s|MODEL_PRIMARY_PLACEHOLDER|${OPENCLAW_MODEL_PRIMARY:-zai/glm-5}|g" "$CONFIG_FILE"
+    sed -i "s|VOLCENGINE_API_KEY_PLACEHOLDER|${OPENCLAW_VOLCENGINE_API_KEY:-your-volcengine-key}|g" "$CONFIG_FILE"
+    sed -i "s|MODEL_PRIMARY_PLACEHOLDER|${OPENCLAW_MODEL_PRIMARY:-volcengine-plan/glm-4.7}|g" "$CONFIG_FILE"
 
     echo -e "${GREEN}[配置] 配置文件已生成: $CONFIG_FILE${NC}"
 else

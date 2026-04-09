@@ -10,8 +10,8 @@
   },
   "auth": {
     "profiles": {
-      "zai:default": {
-        "provider": "zai",
+      "volcengine-plan:default": {
+        "provider": "volcengine-plan",
         "mode": "api_key"
       }
     }
@@ -19,40 +19,27 @@
   "models": {
     "mode": "merge",
     "providers": {
-      "zai": {
-        "baseUrl": "https://api.z.ai/api/coding/paas/v4",
-        "apiKey": "ZAI_API_KEY_PLACEHOLDER",
+      "volcengine-plan": {
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "apiKey": "VOLCENGINE_API_KEY_PLACEHOLDER",
         "api": "openai-completions",
         "models": [
-          {
-            "id": "glm-5",
-            "name": "GLM-5",
-            "contextWindow": 204800,
-            "maxTokens": 131072
-          },
           {
             "id": "glm-4.7",
             "name": "GLM-4.7",
             "contextWindow": 204800,
             "maxTokens": 131072
-          }
-        ]
-      },
-      "bailian": {
-        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1",
-        "apiKey": "BAILIAN_API_KEY_PLACEHOLDER",
-        "api": "openai-completions",
-        "models": [
+          },
           {
-            "id": "qwen3.5-plus",
-            "name": "qwen3.5-plus",
-            "contextWindow": 1000000,
+            "id": "doubao-seed-code",
+            "name": "Doubao Seed Code",
+            "contextWindow": 128000,
             "maxTokens": 65536
           },
           {
-            "id": "qwen3-max-2026-01-23",
-            "name": "qwen3-max-2026-01-23",
-            "contextWindow": 262144,
+            "id": "deepseek-v3.2",
+            "name": "DeepSeek V3.2",
+            "contextWindow": 128000,
             "maxTokens": 65536
           }
         ]
@@ -63,7 +50,7 @@
     "defaults": {
       "model": {
         "primary": "MODEL_PRIMARY_PLACEHOLDER",
-        "fallbacks": ["zai/glm-5", "bailian/qwen3.5-plus"]
+        "fallbacks": ["volcengine-plan/doubao-seed-code", "volcengine-plan/deepseek-v3.2"]
       },
       "workspace": "/root/.openclaw/workspace",
       "compaction": {

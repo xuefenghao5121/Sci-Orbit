@@ -114,7 +114,7 @@ if [ ! -f "$CONFIG_FILE" ] || [ "${FORCE_CONFIG_UPDATE:-false}" = "true" ]; then
     "profile": "full"
   },
   "gateway": {
-    "port": 18789,
+    "port": ${GATEWAY_PORT:-18792},
     "mode": "local",
     "bind": "0.0.0.0",
     "auth": {

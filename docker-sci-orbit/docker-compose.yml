@@ -33,13 +33,14 @@ services:
       # Gateway 运行模式
       - OPENCLAW_GATEWAY_MODE=local
       - OPENCLAW_HOME=/root/.openclaw
+      - GATEWAY_PORT=18792
     
     # 覆盖默认命令（使用前台模式）
     command: ["gateway"]
     
-    # 端口映射
+    # 端口映射 - 18792 避免和本地 OpenClaw (18789) 冲突
     ports:
-      - "18790:18789"  # Gateway API (主机使用 18790 避免冲突)
+      - "18792:18792"  # Gateway API (主机使用 18792 避免和本地 18789 冲突)
     
     # 卷挂载 - 持久化配置
     volumes:
@@ -63,7 +64,7 @@ services:
     
     # 健康检查
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:18792/health"]
       interval: 30s
       timeout: 10s
       retries: 3

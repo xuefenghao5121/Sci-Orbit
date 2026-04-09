@@ -78,8 +78,8 @@ RUN mkdir -p ${OPENCLAW_HOME}/workspace \
 # 设置工作目录
 WORKDIR /app
 
-# 复制 Sci-Orbit 源码（假设已经构建完成）
-COPY ai4s-cli/ /app/ai4s-cli/
+# 复制 Sci-Orbit 源码（从项目根目录复制）
+COPY . /app/ai4s-cli/
 
 # 安装 Sci-Orbit 依赖
 WORKDIR /app/ai4s-cli

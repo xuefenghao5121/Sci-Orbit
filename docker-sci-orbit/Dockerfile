@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 升级 pip
-RUN pip3 install --upgrade pip setuptools wheel
+RUN pip3 install --upgrade pip setuptools wheel --break-system-packages
 
 # 安装科学计算 Python 包（Sci-Orbit 依赖）
 RUN pip3 install --no-cache-dir --break-system-packages \

@@ -1,15 +1,43 @@
 /**
  * AI4S 参数智能补全服务
  * 根据环境信息和任务类型，自动推断和补全隐式参数
- * v0.6.0: 新增 GPAW、CP2K、Quantum ESPRESSO 支持 + 自适应偏好学习
+ * v1.0.0: EvoSkills 升级 - 自进化 + 共同进化验证
+ * 
+ * Changes:
+ * - 引入 EvoSkills Self-Evolving + Co-Evolutionary Verification 架构
+ * - 动态参数模板库替代硬编码静态模板
+ * - Generator + Verifier 双组件共同进化
+ * - 从用户修正中自动学习更新参数置信度
+ * - 环境感知适配，根据硬件调整并行参数
+ * - 参数关联规则挖掘
+ * - 完全向后兼容
  */
 import { EnvironmentDetectorService, type EnvironmentInfo } from './environment-detector.js';
+import { 
+  DynamicTemplateLibrary,
+  ParamGenerator,
+  ParamVerifier,
+  AssociationMiner,
+  EnvironmentAdapter,
+  EvolutionStorage,
+  convertStaticToDynamic,
+  type DynamicToolParamTemplate,
+  type ImplicitParamRuleWithConfidence,
+  type CompletionRequest,
+  type ParamCandidate,
+  type VerifierScoreResult,
+  type ParamViolation,
+  type EnvironmentInfoEx,
+  type UserCorrectionRecord,
+  type EvolutionConfig,
+  DEFAULT_EVOLUTION_CONFIG,
+} from './param-evolution/index.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
-/** 已知的科学计算工具参数模板 */
-interface ToolParamTemplate {
+/** 已知的科学计算工具参数模板（静态，作为种子） */
+export interface ToolParamTemplate {
   name: string;
   category: string;
   required_params: string[];
@@ -226,7 +254,7 @@ const TOOL_TEMPLATES: ToolParamTemplate[] = [
   },
 ];
 
-/** 自适应偏好学习 */
+/** 自适应偏好学习（旧格式，用于迁移）*/
 interface UserCorrection {
   tool: string;
   param: string;
@@ -251,30 +279,81 @@ interface PreferencePattern {
 
 export class ParamCompleterService {
   private envService: EnvironmentDetectorService;
-  private prefsPath: string;
+  private dynamicTemplateLibrary: DynamicTemplateLibrary;
+  private paramGenerator: ParamGenerator;
+  private paramVerifier: ParamVerifier;
+  private associationMiner: AssociationMiner;
+  private environmentAdapter: EnvironmentAdapter;
+  private evolutionConfig: EvolutionConfig;
+  private initialized: boolean = false;
+  private prefsPath: string; // 旧偏好文件路径，用于迁移
 
-  constructor(prefsPath?: string) {
+  constructor(prefsPathOrConfig?: string | Partial<EvolutionConfig>) {
     this.envService = new EnvironmentDetectorService();
-    this.prefsPath = prefsPath || join(homedir(), '.ai4s', 'preferences.json');
+    this.environmentAdapter = new EnvironmentAdapter();
+    
+    let config: Partial<EvolutionConfig> = {};
+    if (typeof prefsPathOrConfig === 'string') {
+      // 兼容旧构造函数签名
+      this.prefsPath = prefsPathOrConfig;
+      config.storagePath = join(prefsPathOrConfig, '..', 'evolution');
+    } else {
+      config = prefsPathOrConfig || {};
+      this.prefsPath = join(homedir(), '.ai4s', 'preferences.json');
+    }
+    
+    this.evolutionConfig = { ...DEFAULT_EVOLUTION_CONFIG, ...config };
+    this.dynamicTemplateLibrary = new DynamicTemplateLibrary(this.evolutionConfig);
+    this.paramGenerator = new ParamGenerator(this.dynamicTemplateLibrary, this.evolutionConfig);
+    this.paramVerifier = new ParamVerifier(this.dynamicTemplateLibrary, this.evolutionConfig);
+    this.associationMiner = new AssociationMiner(
+      this.dynamicTemplateLibrary.getStorage(),
+      this.evolutionConfig
+    );
+    
+    this.initializeBuiltinTemplates();
+    this.migrateOldPreferences();
+    this.initialized = true;
   }
 
-  /** 查找匹配的参数模板 */
+  /** 初始化内置模板 */
+  private initializeBuiltinTemplates(): void {
+    this.dynamicTemplateLibrary.initialize(TOOL_TEMPLATES);
+  }
+
+  /** 迁移旧偏好数据到新存储 */
+  private migrateOldPreferences(): void {
+    if (existsSync(this.prefsPath)) {
+      const migrated = this.dynamicTemplateLibrary.migrateOldPreferences(this.prefsPath);
+      if (migrated) {
+        console.log('[ParamCompleter] Migrated old preferences to EvoSkills storage');
+      }
+    }
+  }
+
+  /** 查找匹配的参数模板（兼容接口）*/
   findTemplate(toolName: string): ToolParamTemplate | undefined {
+    // 对于兼容接口，我们只返回静态模板
     return TOOL_TEMPLATES.find(t => t.name === toolName || t.category === toolName);
   }
 
-  /** 列出所有支持的模板 */
+  /** 列出所有支持的模板（使用动态库）*/
   listTemplates(): Array<{ name: string; category: string; param_count: number }> {
-    return TOOL_TEMPLATES.map(t => ({
+    const dynamicTemplates = this.dynamicTemplateLibrary.listTemplates();
+    return dynamicTemplates.map(t => ({
       name: t.name,
       category: t.category,
-      param_count: Object.keys(t.optional_params).length + Object.keys(t.implicit_params).length,
+      param_count: t.paramCount,
     }));
   }
 
-  /** 智能补全参数 */
+  /** 智能补全参数 - EvoSkills 架构实现 */
   async complete(userParams: UserParams): Promise<CompletedParams> {
-    const template = this.findTemplate(userParams.tool);
+    if (!this.initialized) {
+      this.initializeBuiltinTemplates();
+    }
+
+    const template = this.dynamicTemplateLibrary.getTemplate(userParams.tool);
     if (!template) {
       return {
         explicit: userParams.params,
@@ -288,12 +367,12 @@ export class ParamCompleterService {
     const implicit: Record<string, any> = {};
     const confidence: Record<string, number> = {};
 
-    // 尝试采集环境信息（优雅降级）
-    let env: EnvironmentInfo | null = null;
+    // 尝试采集环境信息（优雅降级），并扩展
+    let envExt: EnvironmentInfoEx | null = null;
     try {
-      env = await this.envService.detect();
+      const env = await this.envService.detect();
+      envExt = this.environmentAdapter.extendEnvironmentInfo(env);
     } catch (error) {
-      // 环境采集失败，继续使用默认值
       warnings.push({
         param: '_env',
         level: 'info',
@@ -301,67 +380,143 @@ export class ParamCompleterService {
       });
     }
 
-    // 1. 检查必填参数
+    // 检查必填参数
     for (const req of template.required_params) {
       if (!(req in userParams.params)) {
         warnings.push({ param: req, level: 'error', message: `Required parameter missing: ${req}` });
       }
     }
 
-    // 2. 补全隐式参数（按模板定义的顺序，支持依赖）
+    // EvoSkills: 使用 Generator + Verifier 架构
+    const request: CompletionRequest = {
+      tool: userParams.tool,
+      userParams: { ...userParams.params },
+      environment: envExt || undefined,
+      beamWidth: this.evolutionConfig.beamWidth,
+    };
+
+    // 1. Generator 生成多个候选
+    const candidates = this.paramGenerator.generateCandidates(request);
+    
+    if (candidates.length === 0) {
+      // 没有生成候选，使用传统方式回退
+      return this.fallbackComplete(template, userParams, envExt, warnings, implicit, confidence);
+    }
+
+    // 2. Verifier 对候选打分
+    const scoredCandidates = this.paramVerifier.scoreCandidates(candidates, template, envExt || undefined);
+    
+    // 3. 选择最高分候选
+    const bestCandidate = this.paramGenerator.selectBestCandidate(scoredCandidates);
+    if (!bestCandidate) {
+      return this.fallbackComplete(template, userParams, envExt, warnings, implicit, confidence);
+    }
+
+    // 4. 提取结果，分离显式和隐式
+    const allParams = bestCandidate.params;
+    for (const [key, value] of Object.entries(allParams)) {
+      if (!(key in userParams.params)) {
+        implicit[key] = value;
+        // 获取参数规则的置信度
+        const rule = template.implicit_params[key];
+        confidence[key] = rule ? rule.confidence : bestCandidate.verifierScore;
+      }
+    }
+    
+    // 也将 optional_params 的默认值添加到 implicit 中（用于向后兼容测试）
+    // 如果已经在 implicit_params 中有学习的规则，使用学习的默认值
+    // 否则使用 optional_params 的原始默认值
+    for (const [key, spec] of Object.entries(template.optional_params)) {
+      if (!(key in userParams.params) && !(key in implicit) && spec.default !== undefined) {
+        // 检查是否已经有学习的隐式规则
+        const implicitRule = template.implicit_params[key];
+        implicit[key] = implicitRule ? implicitRule.default_value : spec.default;
+        confidence[key] = implicitRule ? implicitRule.confidence : 0.95;
+      }
+    }
+
+    // 5. 从 Verifier 结果生成警告
+    const scoreResult = this.paramVerifier.scoreCandidate(bestCandidate, template, envExt || undefined);
+    for (const violation of scoreResult.violations) {
+      warnings.push({
+        param: violation.params.join(','),
+        level: violation.severity,
+        message: violation.message,
+        suggested_value: violation.suggestedFix?.value,
+      });
+    }
+
+    // 6. 对低置信度参数增加警告
+    const minThreshold = this.evolutionConfig.minConfidenceThreshold;
+    for (const [key, conf] of Object.entries(confidence)) {
+      if (conf < minThreshold) {
+        const rule = template.implicit_params[key];
+        warnings.push({
+          param: key,
+          level: rule?.risk_if_wrong === 'critical' ? 'error' : 'warning',
+          message: `Auto-completed "${key}" = ${JSON.stringify(implicit[key])} (confidence: ${(conf * 100).toFixed(0)}%). Low confidence, please verify.`,
+          suggested_value: implicit[key],
+        });
+      }
+    }
+
+    // 增加使用统计
+    template.usageCount += 1;
+    if (warnings.filter(w => w.level === 'error').length === 0) {
+      template.correctCount += 1;
+    }
+    // 保存使用统计
+    this.dynamicTemplateLibrary.getStorage().upsertTemplate(template);
+
+    return {
+      explicit: userParams.params,
+      implicit,
+      warnings,
+      confidence,
+    };
+  }
+
+  /** 回退到传统补全方式，兼容处理 */
+  private fallbackComplete(
+    template: DynamicToolParamTemplate,
+    userParams: UserParams,
+    env: EnvironmentInfoEx | null,
+    warnings: ParamWarning[],
+    implicit: Record<string, any>,
+    confidence: Record<string, number>
+  ): CompletedParams {
     const accumulatedParams = { ...userParams.params };
+    const confidenceManager = this.dynamicTemplateLibrary.getConfidenceManager();
+
     for (const [key, rule] of Object.entries(template.implicit_params)) {
-      // 如果用户已显式指定或前面已推断出，跳过
       if (key in accumulatedParams) {
         confidence[key] = 1.0;
         continue;
       }
 
-      // 尝试推断（使用累积的参数，包含已推断出的值）
-      // 先查偏好
-      const pref = this.findPreference(userParams.tool, key, accumulatedParams);
-      if (pref !== null) {
-        implicit[key] = pref;
-        confidence[key] = 0.85;
-        accumulatedParams[key] = pref;
-        continue;
-      }
-
+      // 使用原有推断逻辑
       const inferred = this.inferParam(key, rule, accumulatedParams, env);
       implicit[key] = inferred.value;
-      confidence[key] = inferred.confidence;
-      accumulatedParams[key] = inferred.value; // 累积到后续推断
+      confidence[key] = this.combineConfidences(rule.confidence, inferred.confidence);
+      accumulatedParams[key] = inferred.value;
 
-      if (inferred.confidence < 0.7) {
+      if (confidence[key] < this.evolutionConfig.minConfidenceThreshold) {
         warnings.push({
           param: key,
           level: rule.risk_if_wrong === 'critical' ? 'error' : 'warning',
-          message: `Auto-completed "${key}" = ${JSON.stringify(inferred.value)} (confidence: ${(inferred.confidence * 100).toFixed(0)}%). Reason: ${inferred.reason}`,
+          message: `Auto-completed "${key}" = ${JSON.stringify(inferred.value)} (confidence: ${(confidence[key] * 100).toFixed(0)}%). Reason: ${inferred.reason}`,
           suggested_value: inferred.value,
         });
       }
     }
 
-    // 3. 填充缺失的 optional 参数默认值（优先查偏好）
+    // 填充默认值
     for (const [key, spec] of Object.entries(template.optional_params)) {
       if (!(key in userParams.params) && !(key in implicit)) {
-        const pref = this.findPreference(userParams.tool, key, accumulatedParams);
-        if (pref !== null) {
-          implicit[key] = pref;
-          confidence[key] = 0.85;
-        } else if (spec.default !== undefined) {
+        if (spec.default !== undefined) {
           implicit[key] = spec.default;
           confidence[key] = 0.95;
         }
-      }
-    }
-
-    // 4. 参数约束检查
-    const allParams = { ...userParams.params, ...implicit };
-    for (const constraint of template.constraints) {
-      const violation = this.checkConstraint(constraint, allParams);
-      if (violation) {
-        warnings.push({ param: constraint.params.join(','), level: 'warning', message: violation });
       }
     }
 
@@ -373,9 +528,15 @@ export class ParamCompleterService {
     };
   }
 
-  /** 验证已有参数（不补全，只检查） */
+  /** 组合置信度 */
+  private combineConfidences(ruleConfidence: number, inferredConfidence: number): number {
+    // 简单平均
+    return (ruleConfidence + inferredConfidence) / 2;
+  }
+
+  /** 验证已有参数（不补全，只检查）- 使用 EvoSkills Verifier */
   validate(userParams: UserParams): ParamWarning[] {
-    const template = this.findTemplate(userParams.tool);
+    const template = this.dynamicTemplateLibrary.getTemplate(userParams.tool);
     if (!template) return [{ param: '*', level: 'warning', message: `Unknown tool: ${userParams.tool}` }];
 
     const warnings: ParamWarning[] = [];
@@ -383,7 +544,7 @@ export class ParamCompleterService {
     // 检查必填
     for (const req of template.required_params) {
       if (!(req in userParams.params)) {
-        warnings.push({ param: req, level: 'error', message: `Required: ${req}` });
+        warnings.push({ param: req, level: 'error', message: `Required parameter missing: ${req}` });
       }
     }
 
@@ -396,10 +557,23 @@ export class ParamCompleterService {
       }
     }
 
-    // 约束检查
-    for (const constraint of template.constraints) {
-      const violation = this.checkConstraint(constraint, userParams.params);
-      if (violation) warnings.push({ param: constraint.params.join(','), level: 'warning', message: violation });
+    // 使用 Verifier 进行完整检查
+    const candidate: ParamCandidate = {
+      params: { ...userParams.params },
+      confidence: 1.0,
+      generatorScore: 1.0,
+      verifierScore: 0,
+      source: 'user-pref',
+    };
+
+    const scoreResult = this.paramVerifier.scoreCandidate(candidate, template);
+    for (const violation of scoreResult.violations) {
+      warnings.push({
+        param: violation.params.join(','),
+        level: violation.severity,
+        message: violation.message,
+        suggested_value: violation.suggestedFix?.value,
+      });
     }
 
     return warnings;
@@ -459,90 +633,107 @@ export class ParamCompleterService {
     return lines.join('\n');
   }
 
-  // --- 自适应偏好学习 ---
+  // --- EvoSkills 自进化学习闭环 ---
 
-  /** 加载偏好文件 */
-  private loadPreferences(): PreferenceProfile {
-    try {
-      if (existsSync(this.prefsPath)) {
-        return JSON.parse(readFileSync(this.prefsPath, 'utf8'));
-      }
-    } catch { /* ignore */ }
-    return { corrections: [], patterns: [] };
-  }
-
-  /** 保存偏好文件 */
-  private savePreferences(prefs: PreferenceProfile): void {
-    const dir = join(this.prefsPath, '..');
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(this.prefsPath, JSON.stringify(prefs, null, 2));
-  }
-
-  /** 记录用户纠正 */
+  /** 记录用户纠正，并触发学习（EvoSkills）*/
   recordCorrection(tool: string, param: string, autoValue: any, userValue: any, context: Record<string, any> = {}): void {
-    const prefs = this.loadPreferences();
-    prefs.corrections.push({
-      tool, param,
+    const template = this.dynamicTemplateLibrary.getTemplate(tool);
+    if (!template) {
+      // 无法学习，工具不存在
+      return;
+    }
+
+    // 1. 记录修正到存储（新 EvoSkills 存储 + 旧格式向后兼容）
+    const correction: UserCorrectionRecord = {
+      id: `${tool}-${param}-${Date.now()}`,
+      tool,
+      param,
       auto_value: autoValue,
       user_value: userValue,
       context,
       timestamp: new Date().toISOString(),
-    });
-    // 更新模式
-    this.updatePatterns(prefs);
-    this.savePreferences(prefs);
-  }
+      templateVersion: template.version,
+    };
+    
+    const storage = this.dynamicTemplateLibrary.getStorage();
+    storage.addCorrection(correction);
 
-  /** 从纠正中提取模式 */
-  private updatePatterns(prefs: PreferenceProfile): void {
-    const corr = prefs.corrections;
-    // 按 tool+param+context 相似度聚合
-    const buckets = new Map<string, PreferencePattern>();
-    for (const c of corr) {
-      const key = `${c.tool}:${c.param}`;
-      // 从context提取简单匹配条件
-      const conditions: Record<string, string> = {};
-      for (const [k, v] of Object.entries(c.context)) {
-        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-          conditions[k] = String(v);
+    // 向后兼容：仍然写入旧偏好文件
+    if (this.prefsPath) {
+      let existing: PreferenceProfile = { corrections: [], patterns: [] };
+      if (existsSync(this.prefsPath)) {
+        try {
+          existing = JSON.parse(readFileSync(this.prefsPath, 'utf8'));
+        } catch (e) {
+          // ignore
         }
       }
-      const condKey = JSON.stringify(conditions);
-      const bucketKey = `${key}:${condKey}`;
-
-      if (buckets.has(bucketKey)) {
-        const p = buckets.get(bucketKey)!;
-        p.count++;
-        p.preferred_value = c.user_value;
-      } else {
-        buckets.set(bucketKey, {
-          tool: c.tool,
-          param: c.param,
-          preferred_value: c.user_value,
-          match_conditions: conditions,
-          count: 1,
-        });
+      // 转换为旧格式
+      existing.corrections.push({
+        tool,
+        param,
+        auto_value: autoValue,
+        user_value: userValue,
+        context,
+        timestamp: correction.timestamp,
+      });
+      // 确保目录存在
+      const dir = require('path').dirname(this.prefsPath);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
       }
+      writeFileSync(this.prefsPath, JSON.stringify(existing, null, 2));
     }
-    prefs.patterns = Array.from(buckets.values());
+
+    // 2. 更新模板中该参数规则的置信度
+    // 原来的自动值错了，用户给了新值
+    this.dynamicTemplateLibrary.updateTemplateFromCorrection(
+      tool,
+      param,
+      autoValue,
+      userValue,
+      false, // was not correct
+      context
+    );
+
+    // 3. 检查是否需要触发关联规则挖掘
+    const corrections = storage.getCorrectionsForTool(tool);
+    if (this.associationMiner.shouldMine(corrections.length)) {
+      // 挖掘关联规则
+      const rules = this.associationMiner.mineRules(tool);
+      this.dynamicTemplateLibrary.updateAssociationRules(rules);
+      this.associationMiner.afterMining();
+      console.log(`[EvoSkills] Mined ${rules.length} association rules for ${tool}`);
+    }
+
+    // 共同进化：Generator 和 Verifier 都从中学习
+    // Generator 已经通过置信度更新学习了
+    // Verifier 通过关联规则更新学习了
   }
 
-  /** 查找匹配的偏好 */
+  /** 查找匹配的偏好（兼容旧代码，委托给动态模板库）*/
   private findPreference(tool: string, param: string, context: Record<string, any>): any | null {
-    const prefs = this.loadPreferences();
-    for (const pattern of prefs.patterns) {
-      if (pattern.tool !== tool || pattern.param !== param) continue;
-      if (pattern.count < 2) continue; // 至少2次才认为有效
-      // 检查匹配条件
-      let match = true;
-      for (const [k, v] of Object.entries(pattern.match_conditions)) {
-        if (context[k] !== undefined && String(context[k]) !== v) {
-          match = false;
-          break;
-        }
+    // 在新架构中，这个功能已经整合到动态模板和置信度中
+    // 这里保留用于兼容回退
+    const template = this.dynamicTemplateLibrary.getTemplate(tool);
+    if (!template) return null;
+    
+    const rule = template.implicit_params[param];
+    if (!rule) return null;
+    
+    // 如果规则置信度很低，可能有用户偏好
+    if (rule.conditionalConfidence) {
+      // 查找条件匹配
+      for (const [key, conf] of Object.entries(rule.conditionalConfidence)) {
+        // 简化处理，直接返回默认值已经包含学习
       }
-      if (match) return pattern.preferred_value;
     }
+    
+    // 如果是学习过的规则，直接返回更新后的默认值
+    if (template.isLearned) {
+      return rule.default_value;
+    }
+    
     return null;
   }
 
